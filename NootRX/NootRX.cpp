@@ -8,6 +8,8 @@
 #include <Headers/kern_api.hpp>
 #include <Headers/kern_devinfo.hpp>
 #include <IOKit/IOCatalogue.h>
+#include <libkern/c++/OSDictionary.h>
+#include <libkern/c++/OSNumber.h>
 
 static const char *pathAGDP = "/System/Library/Extensions/AppleGraphicsControl.kext/Contents/PlugIns/"
                               "AppleGraphicsDevicePolicy.kext/Contents/MacOS/AppleGraphicsDevicePolicy";
@@ -210,6 +212,38 @@ static_assert(arrsize(DriverBundleIdentifiers) == arrsize(DriverBundleXMLsBigSur
 
 static UInt8 matchedDrivers = 0;
 
+// Apply the RX 6750 XT workaround to the injected framebuffer personality.
+// The workaround keeps the normal Navi22 firmware and acceleration path, but
+// avoids the low-power transitions that correlate with the observed GFX hangs.
+static bool apply6750XTStablePowerProfile(OSDictionary *driver) {
+    auto *properties = OSDynamicCast(OSDictionary, driver->getObject("aty_properties"));
+    if (properties == nullptr) { return false; }
+
+    struct PowerProperty {
+        const char *name;
+        UInt64 value;
+    };
+
+    static constexpr PowerProperty stableProperties[] = {
+        {"PP_DisableULV", 1},
+        {"PP_Falcon_QuickTransition_Enable", 0},
+        {"PP_GfxOffControl", 0},
+        {"PP_WorkLoadPolicyMask", 0},
+    };
+
+    for (const auto &property : stableProperties) {
+        auto *number = OSNumber::withNumber(property.value, 32);
+        if (number == nullptr) { return false; }
+        if (!properties->setObject(property.name, number)) {
+            number->release();
+            return false;
+        }
+        number->release();
+    }
+
+    return true;
+}
+
 bool NootRXMain::wrapAddDrivers(void *that, OSArray *array, bool doNubMatching) {
     UInt32 driverCount = array->getCount();
     for (UInt32 driverIndex = 0; driverIndex < driverCount; driverIndex += 1) {
@@ -250,7 +284,14 @@ bool NootRXMain::wrapAddDrivers(void *that, OSArray *array, bool doNubMatching) 
 
                 for (UInt32 injectedDriverIndex = 0; injectedDriverIndex < injectedDriverCount;
                      injectedDriverIndex += 1) {
-                    array->setObject(driverIndex, drivers->getObject(injectedDriverIndex));
+                    auto *injectedDriver = OSDynamicCast(OSDictionary, drivers->getObject(injectedDriverIndex));
+                    if (identifierIndex == 2 && callback->deviceId == 0x73DF && callback->pciRevision == 0xC0 &&
+                        injectedDriver != nullptr && apply6750XTStablePowerProfile(injectedDriver)) {
+                        SYSLOG("NootRX", "Applied RX 6750 XT stable PowerPlay profile (ULV/GFXOFF/quick transition disabled)");
+                    }
+
+                    array->setObject(driverIndex, injectedDriver != nullptr ? injectedDriver
+                                                                             : drivers->getObject(injectedDriverIndex));
                     driverIndex += 1;
                     driverCount += 1;
                 }
