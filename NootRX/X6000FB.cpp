@@ -55,17 +55,39 @@ bool X6000FB::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t s
                 "Failed to route debug symbols");
         }
 
+        // Locate a real Navi donor entry before changing the table. Tahoe's first
+        // entry belongs to a different ASIC and must remain untouched.
+        const UInt32 donorDeviceId = NootRXMain::callback->attributes.isNavi21() ? 0x73BF : 0x73FF;
+        CAILAsicCapsEntry *donorEntry = nullptr;
+        CAILAsicCapsEntry *fallbackEntry = nullptr;
+        constexpr size_t cailAsicCapsTableEntries = 0x1FB;
+        for (size_t index = 0; index < cailAsicCapsTableEntries; index++) {
+            auto *entry = &orgAsicCapsTable[index];
+            if (entry->familyId != AMDGPU_FAMILY_NAVI || entry->deviceId != donorDeviceId ||
+                entry->revNo != NootRXMain::callback->devRevision) {
+                continue;
+            }
+            if (fallbackEntry == nullptr) { fallbackEntry = entry; }
+            if (entry->revId == NootRXMain::callback->pciRevision || entry->revId == 0xFFFFFFFF) {
+                donorEntry = entry;
+                break;
+            }
+        }
+        if (donorEntry == nullptr) { donorEntry = fallbackEntry; }
+        PANIC_COND(donorEntry == nullptr, "X6000FB", "Failed to find ASIC caps donor entry for device 0x%04X",
+            donorDeviceId);
+
         PANIC_COND(MachInfo::setKernelWriting(true, KernelPatcher::kernelWriteLock) != KERN_SUCCESS, "X6000FB",
             "Failed to enable kernel writing");
-        orgAsicCapsTable[0].familyId = AMDGPU_FAMILY_NAVI;
-        orgAsicCapsTable[0].deviceId = NootRXMain::callback->deviceId;
-        orgAsicCapsTable[0].revNo = NootRXMain::callback->devRevision;
-        orgAsicCapsTable[0].emulatedRevNo =
+        donorEntry->familyId = AMDGPU_FAMILY_NAVI;
+        donorEntry->deviceId = NootRXMain::callback->deviceId;
+        donorEntry->revNo = NootRXMain::callback->devRevision;
+        donorEntry->emulatedRevNo =
             static_cast<UInt32>(NootRXMain::callback->enumRevision) + NootRXMain::callback->devRevision;
-        orgAsicCapsTable[0].revId = NootRXMain::callback->pciRevision;
-        orgAsicCapsTable[0].caps = ddiCapsNavi2Universal;
+        donorEntry->revId = NootRXMain::callback->pciRevision;
+        donorEntry->caps = ddiCapsNavi2Universal;
         MachInfo::setKernelWriting(false, KernelPatcher::kernelWriteLock);
-        DBGLOG("X6000FB", "Applied DDI Caps patches");
+        DBGLOG("X6000FB", "Applied DDI Caps patch using donor 0x%04X", donorDeviceId);
 
         if (ADDPR(debugEnabled)) {
             auto *logEnableMaskMinors =
