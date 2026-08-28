@@ -62,3 +62,47 @@ PP_Falcon_QuickTransition_Enable = 0
 PP_GfxOffControl = 0
 PP_WorkLoadPolicyMask = 0
 ```
+
+### Independent experiment boot-args
+
+The stable values above remain the default. Each argument below is optional and
+overrides exactly one property for the RX 6750 XT. Values are the actual driver
+values, so `nootrx-pp-disable-ulv=0` restores ULV while the other three stay at
+their stable values:
+
+```text
+nootrx-pp-disable-ulv=0
+nootrx-pp-gfxoff-control=1
+nootrx-pp-falcon-quick-transition=1
+nootrx-pp-workload-policy-mask=16
+```
+
+Use `-NRXPowerDiag` only during an approved experiment. It enables the existing
+AMDRadeonX6000 PowerPlay/DAL logger routes and records the effective profile in
+the NootRX log before a GPU panic is raised. It is intentionally separate from
+`-NRXDebug` and is disabled by default.
+
+The effective profile is also mirrored to IORegistry as
+`NootRXPowerProfileMask`, `NootRX_PP_DisableULV`,
+`NootRX_PP_GfxOffControl`, `NootRX_PP_Falcon_QuickTransition_Enable`, and
+`NootRX_PP_WorkLoadPolicyMask`.
+
+### Ordered validation plan
+
+The detailed, interactive plan is in
+`docs/validation/2026-08-28-rx6750xt-power-matrix.md`. It uses a
+four-bit Gray-code order so each reboot changes one property. Start from the
+stable profile (`mask=0`), run the specified display-off/wake and Metal workload
+checks, and continue only after the observation window is clean. Any new
+`Kernel_*.gpuRestart`, `GPU Reset failed`, `GFX is hung`, or WindowServer
+watchdog event stops the sequence and requires reverting to `mask=0`.
+
+Useful queries after a reboot or reset:
+
+```sh
+log show --last 24h --style compact --predicate 'eventMessage CONTAINS[c] "NootRX" OR eventMessage CONTAINS[c] "GPU Reset" OR eventMessage CONTAINS[c] "GFX is hung" OR eventMessage CONTAINS[c] "watchdog"'
+ls -lt /Library/Logs/DiagnosticReports/Kernel_*.gpuRestart
+ls -lt /Library/Logs/DiagnosticReports/Retired/Kernel-*.panic
+ioreg -l -w0 -p IOService | grep -E 'NootRXPowerProfileMask|NootRX_PP_'
+ioreg -l -w0 -r -c IOAccelerator | grep -E 'recoveryCount|Temperature|MetalPluginName'
+```

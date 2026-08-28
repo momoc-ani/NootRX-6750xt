@@ -44,7 +44,7 @@ bool X6000FB::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t s
                 "Failed to route getEnumeratedRevisionNumber");
         }
 
-        if (ADDPR(debugEnabled)) {
+        if (ADDPR(debugEnabled) || NootRXMain::callback->isPowerDiagnosticsEnabled()) {
             RouteRequestPlus requests[] = {
                 {"__ZN24AMDRadeonX6000_AmdLogger15initWithPciInfoEP11IOPCIDevice", wrapInitWithPciInfo,
                     this->orgInitWithPciInfo},
@@ -89,7 +89,7 @@ bool X6000FB::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t s
         MachInfo::setKernelWriting(false, KernelPatcher::kernelWriteLock);
         DBGLOG("X6000FB", "Applied DDI Caps patch using donor 0x%04X", donorDeviceId);
 
-        if (ADDPR(debugEnabled)) {
+        if (ADDPR(debugEnabled) || NootRXMain::callback->isPowerDiagnosticsEnabled()) {
             auto *logEnableMaskMinors =
                 patcher.solveSymbol<void *>(id, "__ZN14AmdDalDmLogger19LogEnableMaskMinorsE", slide, size);
             patcher.clearError();
@@ -135,6 +135,7 @@ bool X6000FB::wrapInitWithPciInfo(void *that, void *pciDevice) {
     return ret;
 }
 
+// Records the original GPU panic text together with the active RX 6750 XT profile before panicking.
 void X6000FB::wrapDoGPUPanic(void *, char const *fmt, ...) {
     va_list va;
     va_start(va, fmt);
@@ -143,6 +144,10 @@ void X6000FB::wrapDoGPUPanic(void *, char const *fmt, ...) {
     vsnprintf(buf, 1000, fmt, va);
     va_end(va);
 
+    const auto &profile = NootRXMain::callback->getPowerProfile();
+    SYSLOG("X6000FB", "GPU panic: device=0x%04X pciRev=0x%X profile=0x%X ULV=%u GFXOFF=%u FalconQuick=%u WorkLoadMask=%u message=%s",
+        NootRXMain::callback->deviceId, NootRXMain::callback->pciRevision, profile.overrideMask,
+        profile.disableULV, profile.gfxOffControl, profile.falconQuickTransition, profile.workLoadPolicyMask, buf);
     DBGLOG("X6000FB", "doGPUPanic: %s", buf);
     IOSleep(10000);
     panic("%s", buf);
@@ -184,18 +189,37 @@ constexpr static const char *LogTypes[] = {
     "DisplayStats",
 };
 
+// Returns true when a DAL message contains a marker associated with a GPU reset or hang.
+static bool containsPowerFailureMarker(const char *message) {
+    if (message == nullptr) { return false; }
+
+    return strstr(message, "GFX is hung") != nullptr || strstr(message, "GPU Reset") != nullptr ||
+           strstr(message, "GPU reset") != nullptr || strstr(message, "watchdog") != nullptr ||
+           strstr(message, "Watchdog") != nullptr || strstr(message, "channel") != nullptr;
+}
+
 // Needed to prevent stack overflow
 void X6000FB::wrapDmLoggerWrite(void *, const UInt32 logType, const char *fmt, ...) {
     va_list va;
     va_start(va, fmt);
     auto *message = static_cast<char *>(IOMalloc(0x1000));
+    if (message == nullptr) {
+        va_end(va);
+        SYSLOG("X6000FB", "DAL logger message allocation failed (type=%u)", logType);
+        return;
+    }
     vsnprintf(message, 0x1000, fmt, va);
     va_end(va);
-    auto *epilogue = message[strnlen(message, 0x1000) - 1] == '\n' ? "" : "\n";
+    const auto messageLength = strnlen(message, 0x1000);
+    auto *epilogue = messageLength > 0 && message[messageLength - 1] == '\n' ? "" : "\n";
     if (logType < arrsize(LogTypes)) {
         kprintf("[%s]\t%s%s", LogTypes[logType], message, epilogue);
     } else {
         kprintf("%s%s", message, epilogue);
+    }
+    if (NootRXMain::callback != nullptr && NootRXMain::callback->isPowerDiagnosticsEnabled() &&
+        containsPowerFailureMarker(message)) {
+        SYSLOG("X6000FB", "DAL failure marker: type=%u message=%s", logType, message);
     }
     IOFree(message, 0x1000);
 }

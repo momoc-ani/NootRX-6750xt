@@ -4,6 +4,7 @@
 #pragma once
 #include "DYLDPatches.hpp"
 #include "HWLibs.hpp"
+#include "PowerProfile.hpp"
 #include "X6000.hpp"
 #include "X6000FB.hpp"
 #include <Headers/kern_patcher.hpp>
@@ -49,12 +50,21 @@ class NootRXMain {
     void processPatcher(KernelPatcher &patcher);
 
     private:
+    // Reads independent RX 6750 XT PowerPlay overrides from boot arguments.
+    void configurePowerProfile();
+
     void ensureRMMIO();
     void processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t slide, size_t size);
 
     UInt32 readReg32(UInt32 reg);
     void writeReg32(UInt32 reg, UInt32 val);
     const char *getGCPrefix();
+
+    // Returns the effective PowerPlay profile used for framebuffer injection and diagnostics.
+    const RX6750XTPowerProfile &getPowerProfile() const { return this->powerProfile; }
+
+    // Returns whether verbose GPU failure diagnostics were explicitly requested.
+    bool isPowerDiagnosticsEnabled() const { return this->powerDiagnostics; }
 
     NootRXAttributes attributes {};
     IOMemoryMap *rmmio {nullptr};
@@ -65,6 +75,8 @@ class NootRXMain {
     UInt32 pciRevision {0};
     IOPCIDevice *dGPU {nullptr};
     mach_vm_address_t orgAddDrivers {0};
+    RX6750XTPowerProfile powerProfile {RX6750XTPowerProfile::stable()};
+    bool powerDiagnostics {false};
 
     X6000FB x6000fb {};
     HWLibs hwlibs {};

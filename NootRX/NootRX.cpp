@@ -28,6 +28,9 @@ NootRXMain *NootRXMain::callback = nullptr;
 void NootRXMain::init() {
     SYSLOG("NootRX", "Copyright 2023-2024 ChefKiss. If you've paid for this, you've been scammed.");
 
+    this->powerDiagnostics = checkKernelArgument("-NRXPowerDiag");
+    SYSLOG_COND(this->powerDiagnostics, "NootRX", "Power diagnostics enabled by -NRXPowerDiag");
+
     switch (getKernelVersion()) {
         case KernelVersion::BigSur:
             this->attributes.setBigSur();
@@ -164,6 +167,8 @@ void NootRXMain::processPatcher(KernelPatcher &patcher) {
     DBGLOG("NootRX", "isNavi22: %s", this->attributes.isNavi22() ? "yes" : "no");
     DBGLOG("NootRX", "isNavi23: %s", this->attributes.isNavi23() ? "yes" : "no");
 
+    this->configurePowerProfile();
+
     DeviceInfo::deleter(devInfo);
 
     this->dyldpatches.processPatcher(patcher);
@@ -173,7 +178,7 @@ void NootRXMain::processPatcher(KernelPatcher &patcher) {
     PANIC_COND(!patcher.routeMultipleLong(KernelPatcher::KernelID, &request, 1), "NootRX",
         "Failed to route addDrivers");
 
-    if (ADDPR(debugEnabled)) {
+    if (ADDPR(debugEnabled) || this->powerDiagnostics) {
         this->dGPU->setProperty("PP_LogLevel", 0xFFFFFFFF, 32);
         this->dGPU->setProperty("PP_LogSource", 0xFFFFFFFF, 32);
         this->dGPU->setProperty("PP_LogDestination", 0xFFFFFFFF, 32);
@@ -181,6 +186,7 @@ void NootRXMain::processPatcher(KernelPatcher &patcher) {
         this->dGPU->setProperty("PP_DumpRegister", TRUE, 32);
         this->dGPU->setProperty("PP_DumpSMCTable", TRUE, 32);
         this->dGPU->setProperty("PP_LogDumpTableBuffers", TRUE, 32);
+        SYSLOG("NootRX", "Enabled AMDRadeonX6000 PowerPlay/DAL diagnostic logging");
     }
 }
 
@@ -215,7 +221,7 @@ static UInt8 matchedDrivers = 0;
 // Apply the RX 6750 XT workaround to the injected framebuffer personality.
 // The workaround keeps the normal Navi22 firmware and acceleration path, but
 // avoids the low-power transitions that correlate with the observed GFX hangs.
-static bool apply6750XTStablePowerProfile(OSDictionary *driver) {
+static bool apply6750XTStablePowerProfile(OSDictionary *driver, const RX6750XTPowerProfile &profile) {
     auto *properties = OSDynamicCast(OSDictionary, driver->getObject("aty_properties"));
     if (properties == nullptr) { return false; }
 
@@ -224,14 +230,14 @@ static bool apply6750XTStablePowerProfile(OSDictionary *driver) {
         UInt64 value;
     };
 
-    static constexpr PowerProperty stableProperties[] = {
-        {"PP_DisableULV", 1},
-        {"PP_Falcon_QuickTransition_Enable", 0},
-        {"PP_GfxOffControl", 0},
-        {"PP_WorkLoadPolicyMask", 0},
+    const PowerProperty profileProperties[] = {
+        {"PP_DisableULV", profile.disableULV},
+        {"PP_Falcon_QuickTransition_Enable", profile.falconQuickTransition},
+        {"PP_GfxOffControl", profile.gfxOffControl},
+        {"PP_WorkLoadPolicyMask", profile.workLoadPolicyMask},
     };
 
-    for (const auto &property : stableProperties) {
+    for (const auto &property : profileProperties) {
         auto *number = OSNumber::withNumber(property.value, 32);
         if (number == nullptr) { return false; }
         if (!properties->setObject(property.name, number)) {
@@ -242,6 +248,44 @@ static bool apply6750XTStablePowerProfile(OSDictionary *driver) {
     }
 
     return true;
+}
+
+void NootRXMain::configurePowerProfile() {
+    if (this->deviceId != 0x73DF || this->pciRevision != 0xC0) {
+        return;
+    }
+
+    struct PowerOverride {
+        const char *argument;
+        RX6750XTPowerSetting setting;
+    };
+
+    static constexpr PowerOverride overrides[] = {
+        {kRX6750XTDisableULVArg, RX6750XTPowerSetting::DisableULV},
+        {kRX6750XTGfxOffControlArg, RX6750XTPowerSetting::GfxOffControl},
+        {kRX6750XTFalconQuickTransitionArg, RX6750XTPowerSetting::FalconQuickTransition},
+        {kRX6750XTWorkLoadPolicyMaskArg, RX6750XTPowerSetting::WorkLoadPolicyMask},
+    };
+
+    for (const auto &entry : overrides) {
+        UInt32 value = 0;
+        if (lilu_get_boot_args(entry.argument, &value, sizeof(value))) {
+            if (this->powerProfile.overrideValue(entry.setting, value)) {
+                SYSLOG("NootRX", "PowerPlay override %s=%u", entry.argument, value);
+            }
+        }
+    }
+
+    this->dGPU->setProperty("NootRXPowerProfileMask", this->powerProfile.overrideMask, 32);
+    this->dGPU->setProperty("NootRX_PP_DisableULV", this->powerProfile.disableULV, 32);
+    this->dGPU->setProperty("NootRX_PP_GfxOffControl", this->powerProfile.gfxOffControl, 32);
+    this->dGPU->setProperty("NootRX_PP_Falcon_QuickTransition_Enable", this->powerProfile.falconQuickTransition, 32);
+    this->dGPU->setProperty("NootRX_PP_WorkLoadPolicyMask", this->powerProfile.workLoadPolicyMask, 32);
+
+    SYSLOG("NootRX", "RX6750XT PowerPlay profile: mask=0x%X ULV=%u GFXOFF=%u FalconQuick=%u WorkLoadMask=%u diag=%s",
+        this->powerProfile.overrideMask, this->powerProfile.disableULV, this->powerProfile.gfxOffControl,
+        this->powerProfile.falconQuickTransition, this->powerProfile.workLoadPolicyMask,
+        this->powerDiagnostics ? "on" : "off");
 }
 
 bool NootRXMain::wrapAddDrivers(void *that, OSArray *array, bool doNubMatching) {
@@ -286,8 +330,9 @@ bool NootRXMain::wrapAddDrivers(void *that, OSArray *array, bool doNubMatching) 
                      injectedDriverIndex += 1) {
                     auto *injectedDriver = OSDynamicCast(OSDictionary, drivers->getObject(injectedDriverIndex));
                     if (identifierIndex == 2 && callback->deviceId == 0x73DF && callback->pciRevision == 0xC0 &&
-                        injectedDriver != nullptr && apply6750XTStablePowerProfile(injectedDriver)) {
-                        SYSLOG("NootRX", "Applied RX 6750 XT stable PowerPlay profile (ULV/GFXOFF/quick transition disabled)");
+                        injectedDriver != nullptr && apply6750XTStablePowerProfile(injectedDriver, callback->getPowerProfile())) {
+                        SYSLOG("NootRX", "Applied RX 6750 XT PowerPlay profile (mask=0x%X)",
+                            callback->getPowerProfile().overrideMask);
                     }
 
                     array->setObject(driverIndex, injectedDriver != nullptr ? injectedDriver
