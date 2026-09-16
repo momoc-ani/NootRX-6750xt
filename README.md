@@ -41,6 +41,15 @@ GPU IDs retain the upstream behavior.
 The tradeoff is higher idle power and potentially slightly higher idle
 temperature because the deepest GPU power transitions are restricted.
 
+Tahoe also requires a narrower Navi22 GC compatibility policy. Upstream NootRX
+previously forced both `_gc_sw_init` and `_gc_set_fw_entry_info` to report GC
+10.3.4 while loading Navi22 GC 10.3.2 command processor and RLC firmware. On
+Tahoe only, this fork keeps the hardware-reported GC 10.3.2 runtime path for
+queue, KIQ, and RLC setup, and limits the 10.3.4 compatibility override to
+firmware descriptor creation. Earlier supported macOS releases retain the
+upstream `_gc_sw_init` mapping. Metal and OpenDesign acceleration remain
+enabled.
+
 ### Build
 
 Initialize the submodules and build the release kext with:
