@@ -277,15 +277,12 @@ bool HWLibs::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sl
         }
 
         if (NootRXMain::callback->attributes.isNavi22()) {
-            // Tahoe must retain the hardware-reported GC path for queue, KIQ,
-            // and RLC setup. The descriptor patch below remains independent.
-            if (getKernelVersion() == KernelVersion::Tahoe) {
-                SYSLOG("HWLibs", "Tahoe Navi22 GC runtime uses hardware version; retaining firmware descriptor compatibility");
-            } else {
-                const LookupPatchPlus patch {&kextRadeonX6810HWLibs, kGcSwInitOriginal, kGcSwInitOriginalMask,
-                    kGcSwInitPatched, kGcSwInitPatchedMask, 1};
-                PANIC_COND(!patch.apply(patcher, slide, size), "HWLibs", "Failed to apply Navi 22 gc_sw_init patch");
-            }
+            // Keep runtime setup and firmware descriptors on the same Tahoe-supported GC selector.
+            const LookupPatchPlus patch {&kextRadeonX6810HWLibs, kGcSwInitOriginal, kGcSwInitOriginalMask,
+                kGcSwInitPatched, kGcSwInitPatchedMask, 1};
+            PANIC_COND(!patch.apply(patcher, slide, size), "HWLibs", "Failed to apply Navi 22 gc_sw_init patch");
+            SYSLOG_COND(getKernelVersion() == KernelVersion::Tahoe, "HWLibs",
+                "Tahoe Navi22 GC runtime and firmware descriptors use the GC 10.3.4 compatibility selector");
             if (NootRXMain::callback->attributes.isSonoma1404AndLater()) {
                 const LookupPatchPlus patches[] = {
                     {&kextRadeonX6810HWLibs, kGcSetFwEntryInfoOriginal14_4, kGcSetFwEntryInfoOriginalMask14_4,
