@@ -66,6 +66,9 @@ class NootRXMain {
     // Returns whether verbose GPU failure diagnostics were explicitly requested.
     bool isPowerDiagnosticsEnabled() const { return this->powerDiagnostics; }
 
+    // Publishes the selected DDI capability word for post-boot validation and logs its donor path.
+    void publishDDICapabilitySelection(const char *propertyName, UInt32 donorDeviceId, const UInt32 *caps);
+
     NootRXAttributes attributes {};
     IOMemoryMap *rmmio {nullptr};
     volatile UInt32 *rmmioPtr {nullptr};

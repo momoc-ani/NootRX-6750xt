@@ -2,6 +2,7 @@
 // See LICENSE for details.
 
 #include "HWLibs.hpp"
+#include "DDICapabilityPolicy.hpp"
 #include "Firmware.hpp"
 #include "NootRX.hpp"
 #include "PatcherPlus.hpp"
@@ -144,18 +145,22 @@ bool HWLibs::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sl
         };
 
         UInt32 targetDeviceId = NootRXMain::callback->attributes.isNavi21() ? 0x73BF : 0x73FF;
+        const UInt32 *selectedCaps = nullptr;
         while (true) {
             PANIC_COND(orgCapsTable->deviceId == 0xFFFFFFFF, "HWLibs", "Failed to find ASIC caps init table entry");
             if (orgCapsTable->familyId != AMDGPU_FAMILY_NAVI || orgCapsTable->deviceId != targetDeviceId) {
                 orgCapsTable += 1;
                 continue;
             }
+            // Preserve Tahoe's Apple donor table for Navi22 while retaining the existing universal policy elsewhere.
+            selectedCaps = DDICapabilityPolicy::select(orgCapsTable->caps, ddiCapsNavi2Universal,
+                getKernelVersion() == KernelVersion::Tahoe, NootRXMain::callback->attributes.isNavi22());
             orgCapsTable->deviceId = NootRXMain::callback->deviceId;
             orgCapsTable->revNo = NootRXMain::callback->devRevision;
             orgCapsTable->emulatedRevNo =
                 static_cast<UInt32>(NootRXMain::callback->enumRevision) + NootRXMain::callback->devRevision;
             orgCapsTable->revId = NootRXMain::callback->pciRevision;
-            orgCapsTable->caps = ddiCapsNavi2Universal;
+            orgCapsTable->caps = selectedCaps;
             if (orgCapsInitTable) {
                 *orgCapsInitTable = {
                     .familyId = AMDGPU_FAMILY_NAVI,
@@ -187,6 +192,7 @@ bool HWLibs::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sl
             break;
         }
         MachInfo::setKernelWriting(false, KernelPatcher::kernelWriteLock);
+        NootRXMain::callback->publishDDICapabilitySelection("NootRX_DDICaps_HWLibs", targetDeviceId, selectedCaps);
         DBGLOG("HWLibs", "Applied DDI Caps patches");
 
         auto hijackMemCpyBlock = [=](UInt32 arg1, UInt32 arg1Mask, void (*func)(void *data)) {

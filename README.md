@@ -48,6 +48,16 @@ with Tahoe's available GC Hub implementation while retaining the native Navi22
 GC 10.3.2 command processor and RLC firmware. Metal and OpenDesign
 acceleration remain enabled.
 
+Tahoe also keeps the native Navi23 donor DDI capability table when NootRX maps
+it to Navi22. In particular, the Tahoe-provided feature word `0x42000020` is no
+longer overwritten by the older universal `0x42040028` value. Other macOS and
+GPU paths retain the upstream universal table. This isolated change does not
+alter the PowerPlay workaround, GC selector, Metal, OpenDesign, or VideoToolbox.
+
+The effective word from both Apple driver tables is published to IORegistry as
+`NootRX_DDICaps_X6000FB` and `NootRX_DDICaps_HWLibs`. On Tahoe with Navi22,
+both properties should report decimal `1107296288` (`0x42000020`).
+
 ### Build
 
 Initialize the submodules and build the release kext with:

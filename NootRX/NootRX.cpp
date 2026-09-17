@@ -2,6 +2,7 @@
 // See LICENSE for details.
 
 #include "NootRX.hpp"
+#include "DDICapabilityPolicy.hpp"
 #include "Firmware.hpp"
 #include "Model.hpp"
 #include "PatcherPlus.hpp"
@@ -286,6 +287,14 @@ void NootRXMain::configurePowerProfile() {
         this->powerProfile.overrideMask, this->powerProfile.disableULV, this->powerProfile.gfxOffControl,
         this->powerProfile.falconQuickTransition, this->powerProfile.workLoadPolicyMask,
         this->powerDiagnostics ? "on" : "off");
+}
+
+// Publishes one selected DDI feature word to IORegistry and records its source for post-reset diagnosis.
+void NootRXMain::publishDDICapabilitySelection(const char *propertyName, UInt32 donorDeviceId, const UInt32 *caps) {
+    const UInt32 featureCaps = caps[DDICapabilityPolicy::FeatureCapsIndex];
+    this->dGPU->setProperty(propertyName, featureCaps, 32);
+    SYSLOG("NootRX", "%s donor=0x%04X caps[%u]=0x%08X", propertyName, donorDeviceId,
+        DDICapabilityPolicy::FeatureCapsIndex, featureCaps);
 }
 
 bool NootRXMain::wrapAddDrivers(void *that, OSArray *array, bool doNubMatching) {

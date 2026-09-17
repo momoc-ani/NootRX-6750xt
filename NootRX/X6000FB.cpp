@@ -2,6 +2,7 @@
 // See LICENSE for details.
 
 #include "X6000FB.hpp"
+#include "DDICapabilityPolicy.hpp"
 #include "NootRX.hpp"
 #include "PatcherPlus.hpp"
 #include <Headers/kern_api.hpp>
@@ -77,6 +78,10 @@ bool X6000FB::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t s
         PANIC_COND(donorEntry == nullptr, "X6000FB", "Failed to find ASIC caps donor entry for device 0x%04X",
             donorDeviceId);
 
+        // Preserve Tahoe's Apple donor table for Navi22 while retaining the existing universal policy elsewhere.
+        const auto *selectedCaps = DDICapabilityPolicy::select(donorEntry->caps, ddiCapsNavi2Universal,
+            getKernelVersion() == KernelVersion::Tahoe, NootRXMain::callback->attributes.isNavi22());
+
         PANIC_COND(MachInfo::setKernelWriting(true, KernelPatcher::kernelWriteLock) != KERN_SUCCESS, "X6000FB",
             "Failed to enable kernel writing");
         donorEntry->familyId = AMDGPU_FAMILY_NAVI;
@@ -85,8 +90,10 @@ bool X6000FB::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t s
         donorEntry->emulatedRevNo =
             static_cast<UInt32>(NootRXMain::callback->enumRevision) + NootRXMain::callback->devRevision;
         donorEntry->revId = NootRXMain::callback->pciRevision;
-        donorEntry->caps = ddiCapsNavi2Universal;
+        donorEntry->caps = selectedCaps;
         MachInfo::setKernelWriting(false, KernelPatcher::kernelWriteLock);
+        NootRXMain::callback->publishDDICapabilitySelection("NootRX_DDICaps_X6000FB", donorDeviceId,
+            donorEntry->caps);
         DBGLOG("X6000FB", "Applied DDI Caps patch using donor 0x%04X", donorDeviceId);
 
         if (ADDPR(debugEnabled) || NootRXMain::callback->isPowerDiagnosticsEnabled()) {
