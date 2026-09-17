@@ -192,7 +192,8 @@ bool HWLibs::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sl
             break;
         }
         MachInfo::setKernelWriting(false, KernelPatcher::kernelWriteLock);
-        NootRXMain::callback->publishDDICapabilitySelection("NootRX_DDICaps_HWLibs", targetDeviceId, selectedCaps);
+        NootRXMain::callback->publishDDICapabilitySelection("NootRX_DDICaps_HWLibs", targetDeviceId,
+            orgCapsTable->caps);
         DBGLOG("HWLibs", "Applied DDI Caps patches");
 
         auto hijackMemCpyBlock = [=](UInt32 arg1, UInt32 arg1Mask, void (*func)(void *data)) {

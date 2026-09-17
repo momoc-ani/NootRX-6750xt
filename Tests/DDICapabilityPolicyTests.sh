@@ -14,34 +14,42 @@ fail() {
     exit 1
 }
 
-# Both Apple driver tables must use the same tested capability selection policy.
-framebuffer_policy_count="$(rg -F -c 'DDICapabilityPolicy::select' "$framebuffer_source" || true)"
-hwlibs_policy_count="$(rg -F -c 'DDICapabilityPolicy::select' "$hwlibs_source" || true)"
-[ -n "$framebuffer_policy_count" ] || framebuffer_policy_count=0
-[ -n "$hwlibs_policy_count" ] || hwlibs_policy_count=0
-[ "$framebuffer_policy_count" -eq 1 ] ||
-    fail "X6000Framebuffer must select DDI caps through DDICapabilityPolicy"
-[ "$hwlibs_policy_count" -eq 1 ] ||
-    fail "HWLibs must select DDI caps through DDICapabilityPolicy"
+# X6000Framebuffer must select from its donor first and write the result back to that same entry.
+if ! rg -U -q '^[[:space:]]*const auto \*selectedCaps = DDICapabilityPolicy::select\(donorEntry->caps, ddiCapsNavi2Universal,\n[[:space:]]+getKernelVersion\(\) == KernelVersion::Tahoe, NootRXMain::callback->attributes\.isNavi22\(\)\);' \
+    "$framebuffer_source"; then
+    fail "X6000Framebuffer must select donor DDI caps before the universal table"
+fi
+rg -n '^[[:space:]]*donorEntry->caps = selectedCaps;$' "$framebuffer_source" >/dev/null ||
+    fail "X6000Framebuffer must write selected DDI caps back to its donor entry"
+if ! rg -U -q 'publishDDICapabilitySelection\("NootRX_DDICaps_X6000FB", donorDeviceId,\n[[:space:]]+donorEntry->caps\);' \
+    "$framebuffer_source"; then
+    fail "X6000Framebuffer must publish its final donor caps pointer"
+fi
+
+# HWLibs must apply the same input order, final writeback, init-table link, and published pointer.
+if ! rg -U -q '^[[:space:]]*selectedCaps = DDICapabilityPolicy::select\(orgCapsTable->caps, ddiCapsNavi2Universal,\n[[:space:]]+getKernelVersion\(\) == KernelVersion::Tahoe, NootRXMain::callback->attributes\.isNavi22\(\)\);' \
+    "$hwlibs_source"; then
+    fail "HWLibs must select donor DDI caps before the universal table"
+fi
+rg -n '^[[:space:]]*orgCapsTable->caps = selectedCaps;$' "$hwlibs_source" >/dev/null ||
+    fail "HWLibs must write selected DDI caps back to its donor entry"
+rg -n '^[[:space:]]*\.caps = orgCapsTable->caps,$' "$hwlibs_source" >/dev/null ||
+    fail "HWLibs init and main capability tables are not linked"
+if ! rg -U -q '^[[:space:]]*NootRXMain::callback->publishDDICapabilitySelection\("NootRX_DDICaps_HWLibs", targetDeviceId,\n[[:space:]]+orgCapsTable->caps\);' \
+    "$hwlibs_source"; then
+    fail "HWLibs must publish its final caps table pointer"
+fi
 
 # Direct universal-table assignments would bypass the Tahoe Navi22 preservation rule.
 if rg -n -- '->caps = ddiCapsNavi2Universal' "$framebuffer_source" "$hwlibs_source" >/dev/null; then
     fail "driver tables must not assign ddiCapsNavi2Universal directly"
 fi
 
-# Each patched table publishes its effective feature word for post-boot verification.
-rg -F 'NootRX_DDICaps_X6000FB' "$framebuffer_source" >/dev/null ||
-    fail "X6000Framebuffer DDI capability property is missing"
-rg -F 'NootRX_DDICaps_HWLibs' "$hwlibs_source" >/dev/null ||
-    fail "HWLibs DDI capability property is missing"
+# The shared publisher must remain available to both patched tables.
 rg -F 'publishDDICapabilitySelection' "$main_header" >/dev/null ||
     fail "DDI capability publisher declaration is missing"
 rg -F 'NootRXMain::publishDDICapabilitySelection' "$main_source" >/dev/null ||
     fail "DDI capability publisher implementation is missing"
-
-# The HWLibs init table must consume the same final pointer as its main capability table.
-rg -F '.caps = orgCapsTable->caps' "$hwlibs_source" >/dev/null ||
-    fail "HWLibs init and main capability tables are not linked"
 
 if [ -n "$binary" ]; then
     strings -a "$binary" | rg -F 'NootRX_DDICaps_X6000FB' >/dev/null ||
