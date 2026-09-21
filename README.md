@@ -123,3 +123,45 @@ ls -lt /Library/Logs/DiagnosticReports/Retired/Kernel-*.panic
 ioreg -l -w0 -p IOService | grep -E 'NootRXPowerProfileMask|NootRX_PP_'
 ioreg -l -w0 -r -c IOAccelerator | grep -E 'recoveryCount|Temperature|MetalPluginName'
 ```
+
+### Chromium GPU rasterization flicker workaround
+
+On macOS Tahoe with the RX 6750 XT, Chromium-based applications may briefly
+show cyan, green, red, or white rectangles over small text regions. The issue
+can be visible on the physical display while being absent from a macOS
+screenshot. Safari does not reproduce the same symptom.
+
+The current evidence localises the failure to Chromium's GPU rasterization
+path rather than the page itself or the complete hardware acceleration stack:
+
+```text
+Default Chrome                              -> flickers
+Chrome with zero-copy disabled              -> flickers
+Chrome with all GPU acceleration disabled   -> does not flicker
+Chrome with only GPU rasterization disabled -> does not flicker
+Safari                                      -> does not flicker
+```
+
+No concurrent `GFX is hung`, `GPU Reset failed`, Metal context-loss, or
+WindowServer watchdog event was recorded during the captured flicker. This
+means the proven failure boundary is Chromium/Skia GPU rasterization interacting
+with the active AMD Metal driver. The exact low-level driver defect is not yet
+proven, and the workaround must not be presented as a fix for GPU reset or
+system-freeze events.
+
+For Google Chrome, open the following page and set **GPU rasterization** to
+**Disabled**, then restart Chrome:
+
+```text
+chrome://flags/#enable-gpu-rasterization
+```
+
+The equivalent command-line switch is:
+
+```sh
+open -na "Google Chrome" --args --disable-gpu-rasterization
+```
+
+This keeps GPU compositing, Metal/WebGL, and video hardware decoding enabled;
+only webpage rasterization falls back to the CPU. To revert, restore the flag
+to **Default** and restart Chrome.
