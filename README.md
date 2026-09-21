@@ -198,3 +198,38 @@ This switch is an isolated diagnostic variable. A successful comparison may
 identify DCC as part of the Chromium/Skia flicker path, but the switch is not
 presented as a proven fix for flicker, `GFX is hung`, GPU reset failures, or a
 WindowServer watchdog event.
+
+### Tahoe RX 6750 XT DCC root-cause diagnostics
+
+On Tahoe with `0x73DF/0xC0`, `-NRXPowerDiag` additionally installs four
+read-only DCC wrappers around the Apple accelerator and Framebuffer paths:
+
+```text
+AddrLib identity creation
+shouldAllocScanoutDcc
+AddrLib2 getDccInfo2
+Framebuffer request 0x1A capability query
+```
+
+The wrappers call each Apple function once, preserve its inputs, outputs, and
+return value, and do not change the `GPUDCCDisplayable` decision. Without
+`-NRXPowerDiag`, these routes are not installed. Other operating systems,
+device IDs, and PCI revisions are outside the target gate.
+
+New surface combinations, changed metadata/capabilities, and failures are
+logged with the `DCCDIAG` marker. Repeated successful observations are counted
+instead of being printed for every call. The diagnostic snapshot is published
+under `NootRX_DCCDiag*` on the GPU IORegistry node; it does not publish kernel
+pointers, GPU addresses, or AddrLib mip pointers.
+
+The current stable rollback remains:
+
+```text
+nootrx-gpu-dcc-displayable=0
+```
+
+The diagnostic code does not disable Metal, OpenDesign, VideoToolbox, GPU
+compositing, or hardware video decoding. Follow
+`docs/validation/2026-09-21-rx6750xt-dcc-diagnostic-runbook.md` before changing
+the DCC boot argument. Only one DCC-enabled reproduction is planned; the first
+inconsistent boundary determines the subsequent single-point fix.
