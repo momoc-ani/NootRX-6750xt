@@ -56,8 +56,8 @@ Power profile: ULV=1, GFXOFF=0, FalconQuick=0, WorkLoadPolicyMask=0
 | P2 | 两项功能完整主机回归 | 已完成 | 6 个 C++ 测试与 5 个 shell 集成守卫全部退出码为 0 |
 | P3 | clean Release 构建与产物校验 | 已完成 | `BUILD SUCCEEDED`；x86_64 kext、plist 与诊断标记校验通过 |
 | P4 | 远程推送与 EFI 落盘校验 | 已完成 | 分支已推送；EFI kext 逐文件一致，boot-args 精确计数通过 |
-| P5 | 重启后的安全路由成功路径 | 等待重启 | 新 kext 与 `-NRXDCCDiag` 已部署，尚未加载 |
-| P6 | 重启后的低开销运行观察 | 未开始 | P5 通过后开始 |
+| P5 | 重启后的安全路由成功路径 | 失败 | 新 kext 已加载，但 target gate 返回 false：`Enabled=0`、`RouteMask=0`、`FailureCode=0` |
+| P6 | 重启后的低开销运行观察 | 未开始 | P5 未通过，不进入运行观察 |
 | P7 | Displayable DCC `=1` 根因实验 | 未开始 | 不属于本轮通过条件，需用户再次确认 |
 
 ## P1：独立诊断模式
@@ -155,6 +155,7 @@ nootrx-gpu-dcc-displayable=1
 | 2026-09-21 18:22 +0800 | P2 | 6 个 `Tests/*Tests.cpp` 与 5 个 `Tests/*Tests.sh` 全部运行成功，覆盖 recorder、路由、诊断隔离、DCC displayable、DDI 与 Power profile |
 | 2026-09-21 18:23 +0800 | P3 | clean Release x86_64 构建成功；`Info.plist` 为 OK；二进制集成守卫与 7 个必需标记校验通过 |
 | 2026-09-21 18:26 +0800 | P4 | 分支推送到 `origin/dcc-root-cause-diagnostics`；EFI kext 与构建目录逐文件一致；`-NRXDCCDiag=1`、`-NRXPowerDiag=0`、DCC `=0` 恰好一次；配置与 kext plist 均为 OK |
+| 2026-09-21 19:36 +0800 | P5 | 当前加载 UUID `C7370FEB-19B6-3505-9BC7-278869A26F6D` 与部署构建一致；NVRAM 参数正确，但运行态为 `Enabled=0`、`RouteMask=0`、`FailureCode=0`，按停止条件不进入 P6 |
 
 P4 可恢复备份：
 
@@ -162,3 +163,28 @@ P4 可恢复备份：
 /Volumes/NO NAME/EFI/OC/Kexts/NootRX.kext.backup-20260921-182454
 /Volumes/NO NAME/EFI/OC/config.plist.backup-20260921-182454
 ```
+
+## P5 失败定位
+
+本次启动确认：
+
+```text
+macOS build = 25E253
+GPU device-id = 0x73DF
+GPU revision-id = 0xC0
+boot-args contains -NRXDCCDiag
+NootRX_GPUDCCDisplayableOverride = 1
+NootRX_GPUDCCDisplayable = 0
+recoveryCount = 0
+```
+
+`NootRX_GPUDCCDisplayableOverride=1` 由同一 Tahoe、device ID 与 PCI revision
+目标条件控制，因此这三个条件已经通过。`FailureCode=0` 且 `RouteMask=0`
+说明诊断没有进入锁分配、符号、签名或路由阶段，而是在 target gate 阶段返回
+false。现有属性只能把剩余断点缩小到以下两个输入，不能继续区分：
+
+- 内核启动时 `checkKernelArgument("-NRXDCCDiag")` 的结果；
+- 内核全局 `osversion` 与 `25E253` 的精确比较结果。
+
+在增加这两个门控输入的独立 IORegistry 观测前，不修改 build gate、不绕过
+target gate，也不进入 Displayable DCC `=1` 实验。
