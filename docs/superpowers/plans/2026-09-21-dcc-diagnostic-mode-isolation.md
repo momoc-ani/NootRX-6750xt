@@ -47,8 +47,8 @@
 
 ### 任务 4：完整验证、推送与 EFI 部署
 
-- [ ] 运行全部主机测试和 shell 集成守卫。
-- [ ] clean Release x86_64 构建，校验 plist 与二进制。
+- [x] 运行全部主机测试和 shell 集成守卫。
+- [x] clean Release x86_64 构建，校验 plist 与二进制。
 - [ ] 推送 `dcc-root-cause-diagnostics`。
 - [ ] 备份 EFI 当前 kext/config，替换 kext，并只修改诊断 boot-arg。
 - [ ] 对 EFI kext、config 和参数做落盘验证。
