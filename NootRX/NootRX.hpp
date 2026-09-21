@@ -2,6 +2,7 @@
 // See LICENSE for details.
 
 #pragma once
+#include "DCCDisplayablePolicy.hpp"
 #include "DYLDPatches.hpp"
 #include "HWLibs.hpp"
 #include "PowerProfile.hpp"
@@ -53,6 +54,9 @@ class NootRXMain {
     // Reads independent RX 6750 XT PowerPlay overrides from boot arguments.
     void configurePowerProfile();
 
+    // Reads the Tahoe RX 6750 XT DCC displayable experiment and publishes its effective state.
+    void configureDCCDisplayable();
+
     void ensureRMMIO();
     void processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t slide, size_t size);
 
@@ -62,6 +66,9 @@ class NootRXMain {
 
     // Returns the effective PowerPlay profile used for framebuffer injection and diagnostics.
     const RX6750XTPowerProfile &getPowerProfile() const { return this->powerProfile; }
+
+    // Returns the effective DCC displayable policy used by accelerator personality injection.
+    const GPUDCCDisplayablePolicy &getDCCDisplayablePolicy() const { return this->dccDisplayablePolicy; }
 
     // Returns whether verbose GPU failure diagnostics were explicitly requested.
     bool isPowerDiagnosticsEnabled() const { return this->powerDiagnostics; }
@@ -79,6 +86,7 @@ class NootRXMain {
     IOPCIDevice *dGPU {nullptr};
     mach_vm_address_t orgAddDrivers {0};
     RX6750XTPowerProfile powerProfile {RX6750XTPowerProfile::stable()};
+    GPUDCCDisplayablePolicy dccDisplayablePolicy {GPUDCCDisplayablePolicy::stable()};
     bool powerDiagnostics {false};
 
     X6000FB x6000fb {};

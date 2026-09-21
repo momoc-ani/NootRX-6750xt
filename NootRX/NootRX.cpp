@@ -9,6 +9,7 @@
 #include <Headers/kern_api.hpp>
 #include <Headers/kern_devinfo.hpp>
 #include <IOKit/IOCatalogue.h>
+#include <libkern/c++/OSBoolean.h>
 #include <libkern/c++/OSDictionary.h>
 #include <libkern/c++/OSNumber.h>
 
@@ -168,6 +169,7 @@ void NootRXMain::processPatcher(KernelPatcher &patcher) {
     DBGLOG("NootRX", "isNavi22: %s", this->attributes.isNavi22() ? "yes" : "no");
     DBGLOG("NootRX", "isNavi23: %s", this->attributes.isNavi23() ? "yes" : "no");
 
+    this->configureDCCDisplayable();
     this->configurePowerProfile();
 
     DeviceInfo::deleter(devInfo);
@@ -249,6 +251,49 @@ static bool apply6750XTStablePowerProfile(OSDictionary *driver, const RX6750XTPo
     }
 
     return true;
+}
+
+// Rewrites only the injected Navi23 accelerator personality that contains the RX 6750 XT PCI match.
+static bool applyGPUDCCDisplayableOverride(OSDictionary *driver, const GPUDCCDisplayablePolicy &policy) {
+    if (driver == nullptr || !policy.overridden) { return false; }
+
+    auto *ioClass = OSDynamicCast(OSString, driver->getObject("IOClass"));
+    auto *pciMatch = OSDynamicCast(OSString, driver->getObject("IOPCIMatch"));
+    if (ioClass == nullptr || pciMatch == nullptr) { return false; }
+
+    auto *ioClassValue = ioClass->getCStringNoCopy();
+    auto *pciMatchValue = pciMatch->getCStringNoCopy();
+    if (ioClassValue == nullptr || pciMatchValue == nullptr ||
+        strcmp(ioClassValue, "AMDRadeonX6000_AMDNavi23GraphicsAccelerator") != 0 ||
+        strstr(pciMatchValue, "0x73DF1002") == nullptr) {
+        return false;
+    }
+
+    return driver->setObject("GPUDCCDisplayable", policy.value != 0 ? kOSBooleanTrue : kOSBooleanFalse);
+}
+
+void NootRXMain::configureDCCDisplayable() {
+    if (!GPUDCCDisplayablePolicy::isTarget(
+            getKernelVersion() == KernelVersion::Tahoe, this->deviceId, this->pciRevision)) {
+        return;
+    }
+
+    UInt32 requestedValue = 0;
+    if (lilu_get_boot_args(kGPUDCCDisplayableArg, &requestedValue, sizeof(requestedValue))) {
+        if (this->dccDisplayablePolicy.overrideValue(requestedValue)) {
+            SYSLOG("NootRX", "DCC displayable override %s=%u", kGPUDCCDisplayableArg, requestedValue);
+        } else {
+            SYSLOG("NootRX", "Ignoring invalid DCC displayable override %s=%u", kGPUDCCDisplayableArg,
+                requestedValue);
+        }
+    }
+
+    this->dGPU->setProperty("NootRX_GPUDCCDisplayable", this->dccDisplayablePolicy.value, 32);
+    this->dGPU->setProperty(
+        "NootRX_GPUDCCDisplayableOverride", this->dccDisplayablePolicy.overridden ? 1U : 0U, 32);
+    SYSLOG("NootRX", "RX6750XT DCC displayable: device=0x%04X pciRev=0x%02X os=Tahoe value=%u override=%s",
+        this->deviceId, this->pciRevision, this->dccDisplayablePolicy.value,
+        this->dccDisplayablePolicy.overridden ? "yes" : "no");
 }
 
 void NootRXMain::configurePowerProfile() {
@@ -338,6 +383,11 @@ bool NootRXMain::wrapAddDrivers(void *that, OSArray *array, bool doNubMatching) 
                 for (UInt32 injectedDriverIndex = 0; injectedDriverIndex < injectedDriverCount;
                      injectedDriverIndex += 1) {
                     auto *injectedDriver = OSDynamicCast(OSDictionary, drivers->getObject(injectedDriverIndex));
+                    if (identifierIndex == 0 &&
+                        applyGPUDCCDisplayableOverride(injectedDriver, callback->getDCCDisplayablePolicy())) {
+                        SYSLOG("NootRX", "Applied RX 6750 XT GPUDCCDisplayable=%u",
+                            callback->getDCCDisplayablePolicy().value);
+                    }
                     if (identifierIndex == 2 && callback->deviceId == 0x73DF && callback->pciRevision == 0xC0 &&
                         injectedDriver != nullptr && apply6750XTStablePowerProfile(injectedDriver, callback->getPowerProfile())) {
                         SYSLOG("NootRX", "Applied RX 6750 XT PowerPlay profile (mask=0x%X)",

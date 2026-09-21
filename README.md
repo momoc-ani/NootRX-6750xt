@@ -165,3 +165,36 @@ open -na "Google Chrome" --args --disable-gpu-rasterization
 This keeps GPU compositing, Metal/WebGL, and video hardware decoding enabled;
 only webpage rasterization falls back to the CPU. To revert, restore the flag
 to **Default** and restart Chrome.
+
+### GPUDCCDisplayable experiment
+
+This fork also provides a single-variable driver experiment for macOS Tahoe
+with the RX 6750 XT (`PCI device 0x73DF`, revision `0xC0`):
+
+```text
+nootrx-gpu-dcc-displayable=0
+```
+
+The argument changes only the top-level `GPUDCCDisplayable` property in the
+injected Navi23 `AMDRadeonX6000` accelerator personality. It does not disable
+Metal, OpenDesign, VideoToolbox, GPU compositing, or the existing PowerPlay and
+DDI capability workarounds. When the argument is absent, the injected XML stays
+at `GPUDCCDisplayable=true` and NootRX does not rewrite the property. Using
+`nootrx-gpu-dcc-displayable=1` explicitly writes `true` for an A/B control;
+values other than `0` and `1` are ignored.
+
+After reboot, verify the effective value and override state with:
+
+```sh
+ioreg -l -w0 -p IOService | rg 'NootRX_GPUDCCDisplayable'
+log show --last boot --style compact --predicate 'eventMessage CONTAINS[c] "DCC displayable"'
+```
+
+With `=0`, `NootRX_GPUDCCDisplayable` should be `0` and
+`NootRX_GPUDCCDisplayableOverride` should be `1`. Remove the boot argument to
+return to the current default behavior.
+
+This switch is an isolated diagnostic variable. A successful comparison may
+identify DCC as part of the Chromium/Skia flicker path, but the switch is not
+presented as a proven fix for flicker, `GFX is hung`, GPU reset failures, or a
+WindowServer watchdog event.
