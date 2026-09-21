@@ -171,6 +171,9 @@ void NootRXMain::processPatcher(KernelPatcher &patcher) {
 
     this->configureDCCDisplayable();
     this->configurePowerProfile();
+    this->dccDiagnostics.configure(this->dGPU,
+        DCCDiagnosticsPolicy::isTarget(getKernelVersion() == KernelVersion::Tahoe, this->deviceId,
+            this->pciRevision, this->powerDiagnostics));
 
     DeviceInfo::deleter(devInfo);
 

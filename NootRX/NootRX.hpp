@@ -2,6 +2,7 @@
 // See LICENSE for details.
 
 #pragma once
+#include "DCCDiagnostics.hpp"
 #include "DCCDisplayablePolicy.hpp"
 #include "DYLDPatches.hpp"
 #include "HWLibs.hpp"
@@ -73,6 +74,9 @@ class NootRXMain {
     // Returns whether verbose GPU failure diagnostics were explicitly requested.
     bool isPowerDiagnosticsEnabled() const { return this->powerDiagnostics; }
 
+    // Returns the shared DCC diagnostic recorder used by accelerator and framebuffer routes.
+    DCCDiagnostics &getDCCDiagnostics() { return this->dccDiagnostics; }
+
     // Publishes the selected DDI capability word for post-boot validation and logs its donor path.
     void publishDDICapabilitySelection(const char *propertyName, UInt32 donorDeviceId, const UInt32 *caps);
 
@@ -87,6 +91,7 @@ class NootRXMain {
     mach_vm_address_t orgAddDrivers {0};
     RX6750XTPowerProfile powerProfile {RX6750XTPowerProfile::stable()};
     GPUDCCDisplayablePolicy dccDisplayablePolicy {GPUDCCDisplayablePolicy::stable()};
+    DCCDiagnostics dccDiagnostics {};
     bool powerDiagnostics {false};
 
     X6000FB x6000fb {};

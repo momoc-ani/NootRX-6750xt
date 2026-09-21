@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		DCC000000000000000000001 /* DCCDiagnostics.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCC000000000000000000002 /* DCCDiagnostics.cpp */; };
 		1C748C2D1C21952C0024EED2 /* Plugin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1C748C2C1C21952C0024EED2 /* Plugin.cpp */; };
 		4068898B2A229BF600028D22 /* PatcherPlus.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 406889892A229BF600028D22 /* PatcherPlus.cpp */; };
 		4068898C2A229BF600028D22 /* PatcherPlus.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 4068898A2A229BF600028D22 /* PatcherPlus.hpp */; };
@@ -42,6 +43,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		DCC000000000000000000002 /* DCCDiagnostics.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = DCCDiagnostics.cpp; sourceTree = "<group>"; };
 		1C748C271C21952C0024EED2 /* NootRX.kext */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NootRX.kext; sourceTree = BUILT_PRODUCTS_DIR; };
 		1C748C2C1C21952C0024EED2 /* Plugin.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Plugin.cpp; sourceTree = "<group>"; };
 		1C748C2E1C21952C0024EED2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -192,6 +194,7 @@
 			isa = PBXGroup;
 			children = (
 				D51217862A62008A00EC0BEB /* AMDCommon.hpp */,
+				DCC000000000000000000002 /* DCCDiagnostics.cpp */,
 				40B6A67C2A75A2B9002D8B85 /* DYLDPatches.cpp */,
 				40B6A67D2A75A2B9002D8B85 /* DYLDPatches.hpp */,
 				4095294B2A7970ED00923793 /* Firmware */,
@@ -463,6 +466,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DCC000000000000000000001 /* DCCDiagnostics.cpp in Sources */,
 				D51187ED2A6FB70700F23522 /* X6000FB.cpp in Sources */,
 				40B6A67E2A75A2B9002D8B85 /* DYLDPatches.cpp in Sources */,
 				D579D09E2A629F5300A4BCCE /* NootRX.cpp in Sources */,
