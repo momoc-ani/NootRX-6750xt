@@ -56,6 +56,14 @@ bool X6000FB::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t s
                 "Failed to route debug symbols");
         }
 
+        if (NootRXMain::callback->getDCCDiagnostics().isEnabled()) {
+            RouteRequestPlus diagnosticRequest {
+                "__ZN34AMDRadeonX6000_AmdRadeonController28callPlatformFunctionFromDrvrEjPvS0_S0_",
+                wrapCallPlatformFunctionFromDrvr, this->orgCallPlatformFunctionFromDrvr};
+            PANIC_COND(!diagnosticRequest.route(patcher, id, slide, size), "X6000FB",
+                "Failed to route Framebuffer DCC capability diagnostics");
+        }
+
         // Locate a real Navi donor entry before changing the table. Tahoe's first
         // entry belongs to a different ASIC and must remain untouched.
         const UInt32 donorDeviceId = NootRXMain::callback->attributes.isNavi21() ? 0x73BF : 0x73FF;
@@ -134,6 +142,17 @@ bool X6000FB::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t s
 }
 
 UInt32 X6000FB::wrapGetEnumeratedRevision(void *) { return NootRXMain::callback->enumRevision; }
+
+IOReturn X6000FB::wrapCallPlatformFunctionFromDrvr(void *that, UInt32 requestType, void *param1,
+    void *param2, void *param3) {
+    const auto ret = FunctionCast(wrapCallPlatformFunctionFromDrvr, callback->orgCallPlatformFunctionFromDrvr)(
+        that, requestType, param1, param2, param3);
+    if (requestType == 0x1A) {
+        NootRXMain::callback->getDCCDiagnostics().recordFramebufferCapability(static_cast<UInt32>(ret),
+            static_cast<const AppleDccCapsParametersV1 *>(param1), static_cast<AppleDccCapabilitiesV1 *>(param2));
+    }
+    return ret;
+}
 
 bool X6000FB::wrapInitWithPciInfo(void *that, void *pciDevice) {
     auto ret = FunctionCast(wrapInitWithPciInfo, callback->orgInitWithPciInfo)(that, pciDevice);

@@ -14,11 +14,23 @@ class X6000FB {
 
     private:
     mach_vm_address_t orgInitWithPciInfo {0};
+    mach_vm_address_t orgCallPlatformFunctionFromDrvr {0};
 
+    // Returns the existing enumerated revision selected for the active GPU family.
     static UInt32 wrapGetEnumeratedRevision(void *that);
+
+    // Calls the original logger initialiser before enabling the existing diagnostic log masks.
     static bool wrapInitWithPciInfo(void *that, void *pciDevice);
+
+    // Records the original GPU panic message and active PowerPlay profile before panicking.
     static void wrapDoGPUPanic(void *that, char const *fmt, ...);
+
+    // Forwards one DAL log message while retaining failure markers needed for reset diagnosis.
     static void wrapDmLoggerWrite(void *logger, const UInt32 logType, const char *fmt, ...);
+
+    // Records request 0x1A around the original Framebuffer handler without changing the request.
+    static IOReturn wrapCallPlatformFunctionFromDrvr(void *that, UInt32 requestType, void *param1,
+        void *param2, void *param3);
 };
 
 //------ Patterns ------//
