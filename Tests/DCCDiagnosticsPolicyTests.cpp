@@ -30,10 +30,77 @@ static void testFramebufferDccRequestLayout() {
     static_assert(offsetof(AppleDccCapabilitiesV1, field0) == 0x08);
 }
 
+// Verifies that diagnostics cannot affect other OS, GPU, revision, or boot-mode combinations.
+static void testDiagnosticTargetGate() {
+    assert(DCCDiagnosticsPolicy::isTarget(true, 0x73DF, 0xC0, true));
+    assert(!DCCDiagnosticsPolicy::isTarget(false, 0x73DF, 0xC0, true));
+    assert(!DCCDiagnosticsPolicy::isTarget(true, 0x73FF, 0xC0, true));
+    assert(!DCCDiagnosticsPolicy::isTarget(true, 0x73DF, 0xC1, true));
+    assert(!DCCDiagnosticsPolicy::isTarget(true, 0x73DF, 0xC0, false));
+}
+
+// Verifies that an exact successful duplicate is counted but not logged twice.
+static void testExactDuplicateIsSuppressed() {
+    DCCObservationCache cache;
+    const DCCObservationKey key {DCCDiagnosticStage::ScanoutDecision, {2560, 1440, 1, 32}, 4};
+    const auto first = cache.observe(key, false);
+    const auto duplicate = cache.observe(key, false);
+
+    assert(first.shouldLog);
+    assert(first.sequence == 1);
+    assert(!duplicate.shouldLog);
+    assert(duplicate.sequence == 1);
+    assert(cache.duplicateCount() == 1);
+}
+
+// Verifies that changed output fields form a new observation without a hash.
+static void testChangedMetadataIsLogged() {
+    DCCObservationCache cache;
+    const DCCObservationKey first {DCCDiagnosticStage::AddrLibDccInfo, {2560, 1440, 256, 64}, 4};
+    const DCCObservationKey changed {DCCDiagnosticStage::AddrLibDccInfo, {2560, 1440, 512, 64}, 4};
+
+    assert(cache.observe(first, false).shouldLog);
+    const auto decision = cache.observe(changed, false);
+    assert(decision.shouldLog);
+    assert(decision.sequence == 2);
+}
+
+// Verifies that every failed call remains visible even when its fields repeat.
+static void testRepeatedFailureIsAlwaysLogged() {
+    DCCObservationCache cache;
+    const DCCObservationKey failure {DCCDiagnosticStage::FramebufferCapability, {1, 0xE00002C2}, 2};
+
+    assert(cache.observe(failure, true).shouldLog);
+    const auto repeated = cache.observe(failure, true);
+    assert(repeated.shouldLog);
+    assert(repeated.sequence == 2);
+    assert(cache.errorCount() == 2);
+}
+
+// Verifies that a full fixed cache reports overflow once without allocating or spamming logs.
+static void testCapacityOverflowIsBounded() {
+    DCCObservationCache cache;
+    for (uint32_t value = 0; value < DCCObservationCache::Capacity; value += 1) {
+        const DCCObservationKey key {DCCDiagnosticStage::ScanoutDecision, {value}, 1};
+        assert(cache.observe(key, false).shouldLog);
+    }
+
+    const DCCObservationKey firstOverflow {DCCDiagnosticStage::ScanoutDecision, {0x100}, 1};
+    const DCCObservationKey repeatedOverflow {DCCDiagnosticStage::ScanoutDecision, {0x101}, 1};
+    assert(cache.observe(firstOverflow, false).shouldLog);
+    assert(!cache.observe(repeatedOverflow, false).shouldLog);
+    assert(cache.overflowCount() == 2);
+}
+
 // Runs all dependency-free DCC diagnostic policy tests.
 int main() {
     testAddrLibDccInputLayout();
     testAddrLibDccOutputLayout();
     testFramebufferDccRequestLayout();
+    testDiagnosticTargetGate();
+    testExactDuplicateIsSuppressed();
+    testChangedMetadataIsLogged();
+    testRepeatedFailureIsAlwaysLogged();
+    testCapacityOverflowIsBounded();
     return 0;
 }
