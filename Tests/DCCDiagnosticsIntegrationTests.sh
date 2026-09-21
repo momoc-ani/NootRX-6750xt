@@ -58,14 +58,25 @@ preprocess_source "$framebuffer_source" "$framebuffer_effective" "$sdk_path"
 
 rg -F 'NootRX_DCCDiagEnabled' "$diagnostics_effective" >/dev/null ||
     fail "DCC diagnostic enabled property is missing"
-rg -F 'NootRX_DCCDiagSequence' "$diagnostics_effective" >/dev/null ||
-    fail "DCC diagnostic sequence property is missing"
-rg -F 'NootRX_DCCDiagDuplicateCount' "$diagnostics_effective" >/dev/null ||
-    fail "DCC duplicate counter is missing"
-rg -F 'NootRX_DCCDiagErrorCount' "$diagnostics_effective" >/dev/null ||
-    fail "DCC error counter is missing"
-rg -F 'NootRX_DCCDiagOverflowCount' "$diagnostics_effective" >/dev/null ||
-    fail "DCC overflow counter is missing"
+rg -F 'NootRX_DCCDiagRouteMask' "$diagnostics_effective" >/dev/null ||
+    fail "DCC diagnostic route mask is missing"
+rg -F 'NootRX_DCCDiagFailureCode' "$diagnostics_effective" >/dev/null ||
+    fail "DCC diagnostic failure code is missing"
+rg -F 'NootRX_DCCDiagSnapshot' "$diagnostics_effective" >/dev/null ||
+    fail "atomic DCC diagnostic snapshot property is missing"
+rg -F 'DCCDiagnostics::disable(' "$diagnostics_effective" >/dev/null ||
+    fail "DCC diagnostic safe-disable entry is missing"
+rg -F 'DCCDiagnostics::markRouteReady(' "$diagnostics_effective" >/dev/null ||
+    fail "DCC diagnostic route-ready entry is missing"
+rg -F 'widthBits' "$diagnostics_effective" >/dev/null ||
+    fail "Framebuffer width is not recorded as raw IEEE-754 bits"
+rg -F 'heightBits' "$diagnostics_effective" >/dev/null ||
+    fail "Framebuffer height is not recorded as raw IEEE-754 bits"
+rg -F 'memcpy' "$diagnostics_effective" >/dev/null ||
+    fail "Framebuffer float bit preservation is missing"
+if rg -F 'NootRX_DCCDiagLast' "$diagnostics_effective" >/dev/null; then
+    fail "legacy per-field DCC snapshot publication is still present"
+fi
 rg -F 'DCCDIAG' "$diagnostics_effective" >/dev/null ||
     fail "DCC diagnostic log marker is missing"
 

@@ -77,7 +77,7 @@ enum class DCCDiagnosticStage : uint32_t {
 };
 
 struct DCCObservationKey {
-    static constexpr size_t MaxFields = 16;
+    static constexpr size_t MaxFields = 32;
 
     DCCDiagnosticStage stage;
     uint32_t fields[MaxFields];
