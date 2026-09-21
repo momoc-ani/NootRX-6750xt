@@ -2,6 +2,7 @@
 // See LICENSE for details.
 
 #include "X6000FB.hpp"
+#include "DCCRouteValidation.hpp"
 #include "DDICapabilityPolicy.hpp"
 #include "NootRX.hpp"
 #include "PatcherPlus.hpp"
@@ -56,12 +57,35 @@ bool X6000FB::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t s
                 "Failed to route debug symbols");
         }
 
-        if (NootRXMain::callback->getDCCDiagnostics().isEnabled()) {
-            RouteRequestPlus diagnosticRequest {
+        auto &diagnostics = NootRXMain::callback->getDCCDiagnostics();
+        if (diagnostics.isEnabled()) {
+            mach_vm_address_t framebufferRequestAddress = 0;
+            KernelPatcher::SolveRequest diagnosticSymbol {
                 "__ZN34AMDRadeonX6000_AmdRadeonController28callPlatformFunctionFromDrvrEjPvS0_S0_",
-                wrapCallPlatformFunctionFromDrvr, this->orgCallPlatformFunctionFromDrvr};
-            PANIC_COND(!diagnosticRequest.route(patcher, id, slide, size), "X6000FB",
-                "Failed to route Framebuffer DCC capability diagnostics");
+                framebufferRequestAddress};
+            if (!patcher.solveMultiple(id, &diagnosticSymbol, 1, slide, size)) {
+                diagnostics.disable(DCCDiagnosticFailureCode::FramebufferSymbol,
+                    "failed to resolve Framebuffer diagnostic symbol");
+            } else {
+                // Validate the request dispatcher before installing a wrapper into Apple code.
+                const auto framebufferRequestAvailable =
+                    size - static_cast<size_t>(framebufferRequestAddress - slide);
+                if (!DCCRouteValidation::validateFramebufferRequest(
+                        reinterpret_cast<const uint8_t *>(framebufferRequestAddress), framebufferRequestAvailable)) {
+                    diagnostics.disable(DCCDiagnosticFailureCode::FramebufferSignature,
+                        "Framebuffer diagnostic signature mismatch");
+                } else {
+                    KernelPatcher::RouteRequest diagnosticRoute {
+                        "__ZN34AMDRadeonX6000_AmdRadeonController28callPlatformFunctionFromDrvrEjPvS0_S0_",
+                        wrapCallPlatformFunctionFromDrvr, this->orgCallPlatformFunctionFromDrvr};
+                    if (!patcher.routeMultiple(id, &diagnosticRoute, 1, slide, size)) {
+                        diagnostics.disable(DCCDiagnosticFailureCode::FramebufferRoute,
+                            "failed to route Framebuffer diagnostics");
+                    } else {
+                        diagnostics.markRouteReady(DCCDiagnostics::FramebufferRoute);
+                    }
+                }
+            }
         }
 
         // Locate a real Navi donor entry before changing the table. Tahoe's first
@@ -145,8 +169,7 @@ UInt32 X6000FB::wrapGetEnumeratedRevision(void *) { return NootRXMain::callback-
 
 IOReturn X6000FB::wrapCallPlatformFunctionFromDrvr(void *that, UInt32 requestType, void *param1,
     void *param2, void *param3) {
-    const auto ret = FunctionCast(wrapCallPlatformFunctionFromDrvr, callback->orgCallPlatformFunctionFromDrvr)(
-        that, requestType, param1, param2, param3);
+    const auto ret = callback->orgCallPlatformFunctionFromDrvr(that, requestType, param1, param2, param3);
     if (requestType == 0x1A) {
         NootRXMain::callback->getDCCDiagnostics().recordFramebufferCapability(static_cast<UInt32>(ret),
             static_cast<const AppleDccCapsParametersV1 *>(param1), static_cast<AppleDccCapabilitiesV1 *>(param2));

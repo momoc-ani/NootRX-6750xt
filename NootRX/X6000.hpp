@@ -16,10 +16,15 @@ class X6000 {
     bool processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t slide, size_t size);
 
     private:
+    using AlignManagerInitFunction = IOReturn (*)(void *, void *);
+    using ShouldAllocScanoutDccFunction = bool (*)(void *, UInt32, UInt32, UInt32, UInt32);
+    using GetDccInfo2Function = IOReturn (*)(void *, const AppleAddr2ComputeDccInfoInputV1 *,
+        AppleAddr2ComputeDccInfoOutputV1 *);
+
     mach_vm_address_t orgGetHWInfo {0};
-    mach_vm_address_t orgAlignManagerInit {0};
-    mach_vm_address_t orgShouldAllocScanoutDcc {0};
-    mach_vm_address_t orgGetDccInfo2 {0};
+    AlignManagerInitFunction orgAlignManagerInit {nullptr};
+    ShouldAllocScanoutDccFunction orgShouldAllocScanoutDcc {nullptr};
+    GetDccInfo2Function orgGetDccInfo2 {nullptr};
 
     // Calls the original video-context query before applying the existing device-ID compatibility value.
     static IOReturn wrapGetHWInfo(IOService *accelVideoCtx, void *hwInfo);

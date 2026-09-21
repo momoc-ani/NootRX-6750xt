@@ -13,8 +13,10 @@ class X6000FB {
     bool processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t slide, size_t size);
 
     private:
+    using CallPlatformFunctionFromDrvrFunction = IOReturn (*)(void *, UInt32, void *, void *, void *);
+
     mach_vm_address_t orgInitWithPciInfo {0};
-    mach_vm_address_t orgCallPlatformFunctionFromDrvr {0};
+    CallPlatformFunctionFromDrvrFunction orgCallPlatformFunctionFromDrvr {nullptr};
 
     // Returns the existing enumerated revision selected for the active GPU family.
     static UInt32 wrapGetEnumeratedRevision(void *that);

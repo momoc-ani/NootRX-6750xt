@@ -86,14 +86,48 @@ rg -F '__ZNK36AMDRadeonX6000_AMDAccelResourceAddr221shouldAllocScanoutDccEjjjj' 
     "$x6000_effective" >/dev/null || fail "scanout DCC route is missing"
 rg -F '__ZN33AMDRadeonX6000_AMDHWAlignManager211getDccInfo2EP28_ADDR2_COMPUTE_DCCINFO_INPUTP29_ADDR2_COMPUTE_DCCINFO_OUTPUT' \
     "$x6000_effective" >/dev/null || fail "AddrLib DCC route is missing"
-rg -F 'getDCCDiagnostics().isEnabled()' "$x6000_effective" >/dev/null ||
+rg -F 'diagnostics.isEnabled()' "$x6000_effective" >/dev/null ||
     fail "accelerator DCC routes are not guarded by diagnostic mode"
+rg -F 'KernelPatcher::SolveRequest diagnosticSymbols[]' "$x6000_effective" >/dev/null ||
+    fail "accelerator DCC symbols are not pre-resolved as one set"
+rg -F 'patcher.solveMultiple(id, diagnosticSymbols, slide, size)' "$x6000_effective" >/dev/null ||
+    fail "accelerator DCC symbol pre-resolution is missing"
+rg -F 'DCCRouteValidation::validateAlignManagerInit' "$x6000_effective" >/dev/null ||
+    fail "align-manager route signature is not validated"
+rg -F 'DCCRouteValidation::validateShouldAllocScanoutDcc' "$x6000_effective" >/dev/null ||
+    fail "scanout-DCC route signature is not validated"
+rg -F 'DCCRouteValidation::validateGetDccInfo2' "$x6000_effective" >/dev/null ||
+    fail "AddrLib DCC route signature is not validated"
+rg -F 'KernelPatcher::RouteRequest diagnosticRoutes[]' "$x6000_effective" >/dev/null ||
+    fail "accelerator DCC wrappers are not installed as one route set"
+rg -F 'patcher.routeMultiple(id, diagnosticRoutes, slide, size)' "$x6000_effective" >/dev/null ||
+    fail "accelerator DCC wrappers do not use one routeMultiple call"
+rg -F 'disable(DCCDiagnosticFailureCode::AcceleratorSymbol' "$x6000_effective" >/dev/null ||
+    fail "accelerator symbol failure does not disable diagnostics"
+rg -F 'disable(DCCDiagnosticFailureCode::AcceleratorSignature' "$x6000_effective" >/dev/null ||
+    fail "accelerator signature failure does not disable diagnostics"
+rg -F 'disable(DCCDiagnosticFailureCode::AcceleratorRoute' "$x6000_effective" >/dev/null ||
+    fail "accelerator route failure does not disable diagnostics"
+rg -F 'markRouteReady(DCCDiagnostics::AcceleratorRoute)' "$x6000_effective" >/dev/null ||
+    fail "accelerator route readiness is not published"
+if rg -F 'Failed to route DCC diagnostic symbols' "$x6000_effective" >/dev/null; then
+    fail "accelerator diagnostic route failure still panics"
+fi
+if rg -F 'FunctionCast(wrapAlignManagerInit' "$x6000_effective" >/dev/null ||
+    rg -F 'FunctionCast(wrapShouldAllocScanoutDcc' "$x6000_effective" >/dev/null ||
+    rg -F 'FunctionCast(wrapGetDccInfo2' "$x6000_effective" >/dev/null; then
+    fail "accelerator diagnostic wrappers still use untyped original function casts"
+fi
 
-if ! rg -U -q 'wrapShouldAllocScanoutDcc\([^}]+FunctionCast\(wrapShouldAllocScanoutDcc,[^;]+;[^}]+recordScanoutDecision[^}]+return ret;' \
+if ! rg -U -P -q 'wrapAlignManagerInit\((?s:.*?)callback->orgAlignManagerInit\((?s:.*?);(?s:.*?)recordAddrLibIdentity(?s:.*?)return ret;' \
+    "$x6000_effective"; then
+    fail "align-manager wrapper does not preserve call-record-return order"
+fi
+if ! rg -U -q 'wrapShouldAllocScanoutDcc\([^}]+callback->orgShouldAllocScanoutDcc\([^;]+;[^}]+recordScanoutDecision[^}]+return ret;' \
     "$x6000_effective"; then
     fail "scanout wrapper does not preserve call-record-return order"
 fi
-if ! rg -U -q 'wrapGetDccInfo2\([^}]+FunctionCast\(wrapGetDccInfo2,[^;]+;[^}]+recordAddrLibDccInfo[^}]+return ret;' \
+if ! rg -U -q 'wrapGetDccInfo2\([^}]+callback->orgGetDccInfo2\([^;]+;[^}]+recordAddrLibDccInfo[^}]+return ret;' \
     "$x6000_effective"; then
     fail "AddrLib wrapper does not preserve call-record-return order"
 fi
@@ -104,6 +138,34 @@ rg -F 'requestType == 0x1A' "$framebuffer_effective" >/dev/null ||
     fail "Framebuffer wrapper is not restricted to request 0x1A"
 rg -F 'recordFramebufferCapability' "$framebuffer_effective" >/dev/null ||
     fail "Framebuffer capability recorder call is missing"
+rg -F 'KernelPatcher::SolveRequest diagnosticSymbol' "$framebuffer_effective" >/dev/null ||
+    fail "Framebuffer DCC symbol is not pre-resolved"
+rg -F 'patcher.solveMultiple(id, &diagnosticSymbol, 1, slide, size)' "$framebuffer_effective" >/dev/null ||
+    fail "Framebuffer DCC symbol pre-resolution is missing"
+rg -F 'DCCRouteValidation::validateFramebufferRequest' "$framebuffer_effective" >/dev/null ||
+    fail "Framebuffer DCC route signature is not validated"
+rg -F 'KernelPatcher::RouteRequest diagnosticRoute' "$framebuffer_effective" >/dev/null ||
+    fail "Framebuffer diagnostic wrapper does not use a native route request"
+rg -F 'patcher.routeMultiple(id, &diagnosticRoute, 1, slide, size)' "$framebuffer_effective" >/dev/null ||
+    fail "Framebuffer diagnostic wrapper does not use routeMultiple"
+rg -F 'disable(DCCDiagnosticFailureCode::FramebufferSymbol' "$framebuffer_effective" >/dev/null ||
+    fail "Framebuffer symbol failure does not disable diagnostics"
+rg -F 'disable(DCCDiagnosticFailureCode::FramebufferSignature' "$framebuffer_effective" >/dev/null ||
+    fail "Framebuffer signature failure does not disable diagnostics"
+rg -F 'disable(DCCDiagnosticFailureCode::FramebufferRoute' "$framebuffer_effective" >/dev/null ||
+    fail "Framebuffer route failure does not disable diagnostics"
+rg -F 'markRouteReady(DCCDiagnostics::FramebufferRoute)' "$framebuffer_effective" >/dev/null ||
+    fail "Framebuffer route readiness is not published"
+if rg -F 'Failed to route Framebuffer DCC capability diagnostics' "$framebuffer_effective" >/dev/null; then
+    fail "Framebuffer diagnostic route failure still panics"
+fi
+if rg -F 'FunctionCast(wrapCallPlatformFunctionFromDrvr' "$framebuffer_effective" >/dev/null; then
+    fail "Framebuffer diagnostic wrapper still uses an untyped original function cast"
+fi
+if ! rg -U -P -q 'wrapCallPlatformFunctionFromDrvr\((?s:.*?)callback->orgCallPlatformFunctionFromDrvr\((?s:.*?);(?s:.*?)recordFramebufferCapability(?s:.*?)return ret;' \
+    "$framebuffer_effective"; then
+    fail "Framebuffer wrapper does not preserve call-record-return order"
+fi
 
 if [ -n "$binary" ]; then
     strings -a "$binary" | rg -F 'NootRX_DCCDiagEnabled' >/dev/null ||

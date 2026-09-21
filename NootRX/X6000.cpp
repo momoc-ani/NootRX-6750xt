@@ -2,6 +2,7 @@
 // See LICENSE for details.
 
 #include "X6000.hpp"
+#include "DCCRouteValidation.hpp"
 #include "NootRX.hpp"
 #include "PatcherPlus.hpp"
 #include <Headers/kern_api.hpp>
@@ -36,17 +37,57 @@ bool X6000::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sli
             this->orgGetHWInfo};
         PANIC_COND(!request.route(patcher, id, slide, size), "X6000", "Failed to route getHWInfo");
 
-        if (NootRXMain::callback->getDCCDiagnostics().isEnabled()) {
-            RouteRequestPlus diagnosticRequests[] = {
+        auto &diagnostics = NootRXMain::callback->getDCCDiagnostics();
+        if (diagnostics.isEnabled()) {
+            mach_vm_address_t alignManagerInitAddress = 0;
+            mach_vm_address_t shouldAllocScanoutDccAddress = 0;
+            mach_vm_address_t getDccInfo2Address = 0;
+            KernelPatcher::SolveRequest diagnosticSymbols[] = {
                 {"__ZN33AMDRadeonX6000_AMDHWAlignManager24initEP30AMDRadeonX6000_IAMDHWInterface",
-                    wrapAlignManagerInit, this->orgAlignManagerInit},
+                    alignManagerInitAddress},
                 {"__ZNK36AMDRadeonX6000_AMDAccelResourceAddr221shouldAllocScanoutDccEjjjj",
-                    wrapShouldAllocScanoutDcc, this->orgShouldAllocScanoutDcc},
+                    shouldAllocScanoutDccAddress},
                 {"__ZN33AMDRadeonX6000_AMDHWAlignManager211getDccInfo2EP28_ADDR2_COMPUTE_DCCINFO_INPUTP29_ADDR2_COMPUTE_DCCINFO_OUTPUT",
-                    wrapGetDccInfo2, this->orgGetDccInfo2},
+                    getDccInfo2Address},
             };
-            PANIC_COND(!RouteRequestPlus::routeAll(patcher, id, diagnosticRequests, slide, size), "X6000",
-                "Failed to route DCC diagnostic symbols");
+
+            if (!patcher.solveMultiple(id, diagnosticSymbols, slide, size)) {
+                diagnostics.disable(DCCDiagnosticFailureCode::AcceleratorSymbol,
+                    "failed to resolve accelerator diagnostic symbols");
+            } else {
+                // Keep each validator inside the already range-checked kext image.
+                const auto alignManagerAvailable = size - static_cast<size_t>(alignManagerInitAddress - slide);
+                const auto scanoutAvailable = size - static_cast<size_t>(shouldAllocScanoutDccAddress - slide);
+                const auto getDccInfoAvailable = size - static_cast<size_t>(getDccInfo2Address - slide);
+                const auto signaturesValid = DCCRouteValidation::validateAlignManagerInit(
+                                                 reinterpret_cast<const uint8_t *>(alignManagerInitAddress),
+                                                 alignManagerAvailable) &&
+                                             DCCRouteValidation::validateShouldAllocScanoutDcc(
+                                                 reinterpret_cast<const uint8_t *>(shouldAllocScanoutDccAddress),
+                                                 scanoutAvailable) &&
+                                             DCCRouteValidation::validateGetDccInfo2(
+                                                 reinterpret_cast<const uint8_t *>(getDccInfo2Address),
+                                                 getDccInfoAvailable);
+                if (!signaturesValid) {
+                    diagnostics.disable(DCCDiagnosticFailureCode::AcceleratorSignature,
+                        "accelerator diagnostic signature mismatch");
+                } else {
+                    KernelPatcher::RouteRequest diagnosticRoutes[] = {
+                        {"__ZN33AMDRadeonX6000_AMDHWAlignManager24initEP30AMDRadeonX6000_IAMDHWInterface",
+                            wrapAlignManagerInit, this->orgAlignManagerInit},
+                        {"__ZNK36AMDRadeonX6000_AMDAccelResourceAddr221shouldAllocScanoutDccEjjjj",
+                            wrapShouldAllocScanoutDcc, this->orgShouldAllocScanoutDcc},
+                        {"__ZN33AMDRadeonX6000_AMDHWAlignManager211getDccInfo2EP28_ADDR2_COMPUTE_DCCINFO_INPUTP29_ADDR2_COMPUTE_DCCINFO_OUTPUT",
+                            wrapGetDccInfo2, this->orgGetDccInfo2},
+                    };
+                    if (!patcher.routeMultiple(id, diagnosticRoutes, slide, size)) {
+                        diagnostics.disable(DCCDiagnosticFailureCode::AcceleratorRoute,
+                            "failed to route accelerator diagnostics");
+                    } else {
+                        diagnostics.markRouteReady(DCCDiagnostics::AcceleratorRoute);
+                    }
+                }
+            }
         }
 
         if (NootRXMain::callback->attributes.isNavi22() && NootRXMain::callback->attributes.isVenturaAndLater()) {
@@ -76,7 +117,7 @@ static UInt32 callHardwareInterfaceGetter(void *hardwareInterface, size_t byteOf
 }
 
 IOReturn X6000::wrapAlignManagerInit(void *that, void *hardwareInterface) {
-    const auto ret = FunctionCast(wrapAlignManagerInit, callback->orgAlignManagerInit)(that, hardwareInterface);
+    const auto ret = callback->orgAlignManagerInit(that, hardwareInterface);
 
     UInt32 chipEngine = 0;
     UInt32 chipFamily = 0;
@@ -93,8 +134,7 @@ IOReturn X6000::wrapAlignManagerInit(void *that, void *hardwareInterface) {
 
 bool X6000::wrapShouldAllocScanoutDcc(void *that, UInt32 width, UInt32 height, UInt32 candidateFlags,
     UInt32 pixelFormatSelector) {
-    const auto ret = FunctionCast(wrapShouldAllocScanoutDcc, callback->orgShouldAllocScanoutDcc)(
-        that, width, height, candidateFlags, pixelFormatSelector);
+    const auto ret = callback->orgShouldAllocScanoutDcc(that, width, height, candidateFlags, pixelFormatSelector);
     NootRXMain::callback->getDCCDiagnostics().recordScanoutDecision(
         width, height, candidateFlags, pixelFormatSelector, ret);
     return ret;
@@ -102,7 +142,7 @@ bool X6000::wrapShouldAllocScanoutDcc(void *that, UInt32 width, UInt32 height, U
 
 IOReturn X6000::wrapGetDccInfo2(void *that, const AppleAddr2ComputeDccInfoInputV1 *input,
     AppleAddr2ComputeDccInfoOutputV1 *output) {
-    const auto ret = FunctionCast(wrapGetDccInfo2, callback->orgGetDccInfo2)(that, input, output);
+    const auto ret = callback->orgGetDccInfo2(that, input, output);
     NootRXMain::callback->getDCCDiagnostics().recordAddrLibDccInfo(static_cast<UInt32>(ret), input, output);
     return ret;
 }
