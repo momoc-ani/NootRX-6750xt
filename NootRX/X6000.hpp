@@ -2,6 +2,7 @@
 // See LICENSE for details.
 
 #pragma once
+#include "DCCDiagnosticsPolicy.hpp"
 #include <Headers/kern_patcher.hpp>
 #include <Headers/kern_util.hpp>
 #include <IOKit/IOService.h>
@@ -16,8 +17,23 @@ class X6000 {
 
     private:
     mach_vm_address_t orgGetHWInfo {0};
+    mach_vm_address_t orgAlignManagerInit {0};
+    mach_vm_address_t orgShouldAllocScanoutDcc {0};
+    mach_vm_address_t orgGetDccInfo2 {0};
 
+    // Calls the original video-context query before applying the existing device-ID compatibility value.
     static IOReturn wrapGetHWInfo(IOService *accelVideoCtx, void *hwInfo);
+
+    // Calls the original AddrLib initialiser and records the exact create identity getters.
+    static IOReturn wrapAlignManagerInit(void *that, void *hardwareInterface);
+
+    // Calls the original scanout decision and records its unmodified inputs and result.
+    static bool wrapShouldAllocScanoutDcc(void *that, UInt32 width, UInt32 height, UInt32 candidateFlags,
+        UInt32 pixelFormatSelector);
+
+    // Calls the original AddrLib DCC computation and records its unmodified input and output.
+    static IOReturn wrapGetDccInfo2(void *that, const AppleAddr2ComputeDccInfoInputV1 *input,
+        AppleAddr2ComputeDccInfoOutputV1 *output);
 };
 
 //------ Patches ------//
