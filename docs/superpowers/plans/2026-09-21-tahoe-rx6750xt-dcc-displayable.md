@@ -25,7 +25,7 @@
 - 创建：`Tests/DCCDisplayablePolicyTests.cpp`
 - 创建：`NootRX/DCCDisplayablePolicy.hpp`
 
-- [ ] **步骤 1：编写失败的策略测试**
+- [x] **步骤 1：编写失败的策略测试**
 
 创建 `Tests/DCCDisplayablePolicyTests.cpp`：
 
@@ -87,7 +87,7 @@ int main() {
 
 该测试要抓住的破坏包括：默认状态意外开始改写 XML、非 Tahoe/非目标设备进入实验路径、非法值被当作有效覆盖。
 
-- [ ] **步骤 2：运行测试并验证红灯**
+- [x] **步骤 2：运行测试并验证红灯**
 
 运行：
 
@@ -98,7 +98,7 @@ clang++ -std=c++17 -Wall -Wextra -Werror Tests/DCCDisplayablePolicyTests.cpp -o 
 
 预期：编译失败，明确提示缺少 `NootRX/DCCDisplayablePolicy.hpp`。
 
-- [ ] **步骤 3：编写最小策略实现**
+- [x] **步骤 3：编写最小策略实现**
 
 创建 `NootRX/DCCDisplayablePolicy.hpp`：
 
@@ -136,7 +136,7 @@ struct GPUDCCDisplayablePolicy {
 };
 ```
 
-- [ ] **步骤 4：运行测试并验证绿灯**
+- [x] **步骤 4：运行测试并验证绿灯**
 
 运行：
 
@@ -148,7 +148,7 @@ clang++ -std=c++17 -Wall -Wextra -Werror Tests/DCCDisplayablePolicyTests.cpp -o 
 
 预期：编译和测试进程均以退出码 0 结束。
 
-- [ ] **步骤 5：提交策略与单元测试**
+- [x] **步骤 5：提交策略与单元测试**
 
 ```sh
 git add NootRX/DCCDisplayablePolicy.hpp Tests/DCCDisplayablePolicyTests.cpp
@@ -163,7 +163,7 @@ git commit -m "test: define RX 6750 XT DCC displayable policy"
 - 修改：`NootRX/NootRX.cpp`
 - 修改：`README.md`
 
-- [ ] **步骤 1：编写失败的集成守卫**
+- [x] **步骤 1：编写失败的集成守卫**
 
 创建 `Tests/DCCDisplayableIntegrationTests.sh`。脚本先用当前 SDK 预处理实际 `NootRX.cpp`，排除注释和禁用分支造成的假阳性，再验证下列有效代码关系：
 
@@ -230,7 +230,7 @@ printf '%s\n' "PASS: Tahoe RX 6750 XT DCC displayable override is wired to the a
 
 该守卫要抓住的破坏包括：配置对象存在但未接入启动链路、写错驱动分支、缺少 Navi23/PCI 双重匹配、诊断属性只存在于注释中、最终二进制未包含参数或属性。
 
-- [ ] **步骤 2：运行集成守卫并验证红灯**
+- [x] **步骤 2：运行集成守卫并验证红灯**
 
 运行：
 
@@ -240,7 +240,7 @@ sh Tests/DCCDisplayableIntegrationTests.sh
 
 预期：FAIL，提示 Tahoe RX 6750 XT target gate 尚未接入。
 
-- [ ] **步骤 3：在主类中保存并解析配置**
+- [x] **步骤 3：在主类中保存并解析配置**
 
 在 `NootRX/NootRX.hpp` 引入策略头文件，增加带用途注释的方法和字段：
 
@@ -270,7 +270,7 @@ NootRX_GPUDCCDisplayableOverride
 
 并记录包含 `device=0x73DF pciRev=0xC0 os=Tahoe value=<0|1> override=<yes|no>` 的启动日志。
 
-- [ ] **步骤 4：只改写目标 accelerator personality**
+- [x] **步骤 4：只改写目标 accelerator personality**
 
 在 `NootRX/NootRX.cpp` 增加带用途注释的 `applyGPUDCCDisplayableOverride()`。方法按以下顺序返回 `false`：配置未覆盖、`IOClass` 不是 `AMDRadeonX6000_AMDNavi23GraphicsAccelerator`、`IOPCIMatch` 不包含 `0x73DF1002`。全部匹配时执行：
 
@@ -281,7 +281,7 @@ driver->setObject("GPUDCCDisplayable",
 
 `wrapAddDrivers()` 只在 `identifierIndex == 0`（`com.apple.kext.AMDRadeonX6000`）时调用该 helper；成功后记录最终值。不得修改 framebuffer (`identifierIndex == 2`) 的 PowerPlay helper 及其他注入数组。
 
-- [ ] **步骤 5：更新 fork 说明和实机验证边界**
+- [x] **步骤 5：更新 fork 说明和实机验证边界**
 
 在 README 的 Chromium 闪烁章节后增加 `GPUDCCDisplayable experiment` 小节，明确：
 
@@ -298,7 +298,7 @@ log show --last boot --style compact --predicate 'eventMessage CONTAINS[c] "DCC 
 
 回滚方式为删除 boot-arg。文档不得声称它已经修复闪烁、GPU Reset、GFX hang 或 WindowServer watchdog，也不得暗示 Metal、OpenDesign 或 VideoToolbox 被关闭。
 
-- [ ] **步骤 6：运行新增测试和现有回归测试**
+- [x] **步骤 6：运行新增测试和现有回归测试**
 
 运行：
 
@@ -319,7 +319,7 @@ git diff --check
 
 预期：所有命令退出码为 0；现有 PowerPlay、DDI capability 与 GC 策略测试无回归。
 
-- [ ] **步骤 7：提交接入实现与文档**
+- [x] **步骤 7：提交接入实现与文档**
 
 ```sh
 git add NootRX/NootRX.hpp NootRX/NootRX.cpp Tests/DCCDisplayableIntegrationTests.sh README.md
@@ -332,7 +332,7 @@ git commit -m "feat: add Tahoe RX 6750 XT DCC displayable override"
 - 构建：`build/Release/NootRX.kext`
 - 集成：主工作区 `master`
 
-- [ ] **步骤 1：执行干净 Release x86_64 构建**
+- [x] **步骤 1：执行干净 Release x86_64 构建**
 
 运行：
 
@@ -342,7 +342,7 @@ xcodebuild -project NootRX.xcodeproj -configuration Release -arch x86_64 clean b
 
 预期：输出包含 `** BUILD SUCCEEDED **`，退出码为 0。
 
-- [ ] **步骤 2：验证构建产物包含实际接线**
+- [x] **步骤 2：验证构建产物包含实际接线**
 
 运行：
 
@@ -355,7 +355,7 @@ strings -a build/Release/NootRX.kext/Contents/MacOS/NootRX | rg 'nootrx-gpu-dcc-
 
 预期：plist、签名与集成守卫全部通过，二进制包含 boot-arg 和两个 IORegistry 属性名。
 
-- [ ] **步骤 3：重新运行完整测试与工作区检查**
+- [x] **步骤 3：重新运行完整测试与工作区检查**
 
 运行任务 2 步骤 6 的完整命令，并额外运行：
 
