@@ -100,45 +100,50 @@ struct DCCObservationKey {
 
 struct DCCObservationDecision {
     bool shouldLog;
+    bool shouldPublish;
+    bool overflow;
     uint32_t sequence;
+    uint32_t repeatCount;
 };
 
 class DCCObservationCache {
     public:
     static constexpr size_t Capacity = 32;
 
-    // Logs new values and failures while suppressing exact successful duplicates.
+    // Records one observation using independent bounded storage for its diagnostic stage.
     DCCObservationDecision observe(const DCCObservationKey &key, bool failure) {
-        if (failure) {
-            this->errorValue += 1;
-            this->sequenceValue += 1;
-            return {true, this->sequenceValue};
-        }
+        auto &stageCache = this->stageCaches[stageIndex(key.stage)];
+        if (failure) { this->errorValue += 1; }
 
-        for (size_t index = 0; index < this->entryCount; index += 1) {
-            if (this->entries[index].equals(key)) {
+        for (size_t index = 0; index < stageCache.entryCount; index += 1) {
+            auto &entry = stageCache.entries[index];
+            if (entry.failure == failure && entry.key.equals(key)) {
                 this->duplicateValue += 1;
-                return {false, this->sequenceValue};
+                entry.repeatCount += 1;
+                const auto checkpoint = isLogarithmicCheckpoint(entry.repeatCount);
+                if (checkpoint) { this->sequenceValue += 1; }
+                return {failure && checkpoint, checkpoint, false, this->sequenceValue, entry.repeatCount};
             }
         }
 
-        if (this->entryCount < Capacity) {
-            this->entries[this->entryCount] = key;
-            this->entryCount += 1;
+        if (stageCache.entryCount < Capacity) {
+            auto &entry = stageCache.entries[stageCache.entryCount];
+            entry.key = key;
+            entry.failure = failure;
+            entry.repeatCount = 0;
+            stageCache.entryCount += 1;
             this->sequenceValue += 1;
-            return {true, this->sequenceValue};
+            return {true, true, false, this->sequenceValue, 0};
         }
 
+        stageCache.overflowCount += 1;
         this->overflowValue += 1;
-        if (this->overflowValue == 1) {
-            this->sequenceValue += 1;
-            return {true, this->sequenceValue};
-        }
-
-        return {false, this->sequenceValue};
+        const auto checkpoint = isLogarithmicCheckpoint(stageCache.overflowCount);
+        if (checkpoint) { this->sequenceValue += 1; }
+        return {checkpoint, checkpoint, true, this->sequenceValue, stageCache.overflowCount};
     }
 
-    // Returns the number of exact successful duplicates suppressed so far.
+    // Returns the number of exact success or failure repetitions observed so far.
     uint32_t duplicateCount() const { return this->duplicateValue; }
 
     // Returns the number of failure observations recorded so far.
@@ -148,8 +153,32 @@ class DCCObservationCache {
     uint32_t overflowCount() const { return this->overflowValue; }
 
     private:
-    DCCObservationKey entries[Capacity] {};
-    size_t entryCount {0};
+    static constexpr size_t StageCount = 4;
+
+    struct Entry {
+        DCCObservationKey key {};
+        bool failure {false};
+        uint32_t repeatCount {0};
+    };
+
+    struct StageCache {
+        Entry entries[Capacity] {};
+        size_t entryCount {0};
+        uint32_t overflowCount {0};
+    };
+
+    // Converts the one-based public stage identifier into fixed-array storage.
+    static constexpr size_t stageIndex(DCCDiagnosticStage stage) {
+        const auto value = static_cast<size_t>(stage);
+        return value >= 1 && value <= StageCount ? value - 1 : 0;
+    }
+
+    // Returns true only for the bounded repeat checkpoints 1, 2, 4, 8, and so on.
+    static constexpr bool isLogarithmicCheckpoint(uint32_t value) {
+        return value != 0 && (value & (value - 1)) == 0;
+    }
+
+    StageCache stageCaches[StageCount] {};
     uint32_t sequenceValue {0};
     uint32_t duplicateValue {0};
     uint32_t errorValue {0};
