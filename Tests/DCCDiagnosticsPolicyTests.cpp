@@ -30,13 +30,16 @@ static void testFramebufferDccRequestLayout() {
     static_assert(offsetof(AppleDccCapabilitiesV1, field0) == 0x08);
 }
 
-// Verifies that diagnostics cannot affect other OS, GPU, revision, or boot-mode combinations.
+// Verifies that build-specific diagnostics cannot affect another OS build, GPU, revision, or boot mode.
 static void testDiagnosticTargetGate() {
-    assert(DCCDiagnosticsPolicy::isTarget(true, 0x73DF, 0xC0, true));
-    assert(!DCCDiagnosticsPolicy::isTarget(false, 0x73DF, 0xC0, true));
-    assert(!DCCDiagnosticsPolicy::isTarget(true, 0x73FF, 0xC0, true));
-    assert(!DCCDiagnosticsPolicy::isTarget(true, 0x73DF, 0xC1, true));
-    assert(!DCCDiagnosticsPolicy::isTarget(true, 0x73DF, 0xC0, false));
+    assert(DCCDiagnosticsPolicy::isTarget(true, "25E253", 0x73DF, 0xC0, true));
+    assert(!DCCDiagnosticsPolicy::isTarget(true, "25E252", 0x73DF, 0xC0, true));
+    assert(!DCCDiagnosticsPolicy::isTarget(true, "25E254", 0x73DF, 0xC0, true));
+    assert(!DCCDiagnosticsPolicy::isTarget(true, nullptr, 0x73DF, 0xC0, true));
+    assert(!DCCDiagnosticsPolicy::isTarget(false, "25E253", 0x73DF, 0xC0, true));
+    assert(!DCCDiagnosticsPolicy::isTarget(true, "25E253", 0x73FF, 0xC0, true));
+    assert(!DCCDiagnosticsPolicy::isTarget(true, "25E253", 0x73DF, 0xC1, true));
+    assert(!DCCDiagnosticsPolicy::isTarget(true, "25E253", 0x73DF, 0xC0, false));
 }
 
 // Verifies that an exact successful duplicate is counted but not logged twice.

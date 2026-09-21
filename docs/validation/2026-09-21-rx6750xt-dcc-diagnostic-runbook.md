@@ -4,6 +4,8 @@
 
 本手册用于 macOS Tahoe 26.4.1 build `25E253`、RX 6750 XT `0x73DF/0xC0`。目标是在不猜测修改 capability、ASIC identity 或 metadata 的前提下，只进行一次 Displayable DCC 开启复现，定位 accelerator、AddrLib2 与 Framebuffer 之间第一个发生不一致的边界。
 
+诊断路由对 build `25E253` 做精确门控。若系统 build 不一致，`NootRX_DCCDiagEnabled` 必须保持为 `0`，不得继续本手册的实机步骤。
+
 诊断候选版必须保留 Metal、OpenDesign、VideoToolbox、GPU compositing 与硬件视频解码。除 DCC 变量外，不更改 ULV、GFXOFF、Falcon Quick Transition、WorkLoadPolicy、Chrome 参数、显示器连接和页面复现条件。
 
 ## 阶段一：DCC 关闭基线

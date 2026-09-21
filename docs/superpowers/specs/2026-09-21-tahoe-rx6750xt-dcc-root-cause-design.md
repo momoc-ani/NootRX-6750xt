@@ -114,13 +114,13 @@ Framebuffer/DAL 接收 surface 与 DCC 参数并执行 scanout
 诊断功能只在以下条件同时成立时启用：
 
 ```text
-macOS Tahoe
+macOS Tahoe build 25E253
 device-id = 0x73DF
 pci-revision = 0xC0
 -NRXPowerDiag 已启用
 ```
 
-不增加新的诊断 boot-arg。未启用 `-NRXPowerDiag` 时，不路由诊断函数，也不产生额外的逐 surface 日志。
+不增加新的诊断 boot-arg。其他 Tahoe build 必须重新核对四个符号、函数体、虚表偏移和 ABI 后才能扩展门控。未启用 `-NRXPowerDiag` 时，不路由诊断函数，也不产生额外的逐 surface 日志。
 
 ### 诊断数据
 

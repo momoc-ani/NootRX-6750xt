@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 // Mirrors Tahoe 25E253's AddrLib2 DCC input. The size field must equal 0x34 before use.
 struct AppleAddr2ComputeDccInfoInputV1 {
@@ -157,9 +158,11 @@ class DCCObservationCache {
 
 namespace DCCDiagnosticsPolicy {
 
-// Restricts diagnostics to the approved Tahoe RX 6750 XT target and explicit diagnostic mode.
-constexpr bool isTarget(bool isTahoe, uint32_t deviceId, uint32_t pciRevision, bool diagnosticsRequested) {
-    return isTahoe && deviceId == 0x73DF && pciRevision == 0xC0 && diagnosticsRequested;
+// Restricts build-specific diagnostics to the verified Tahoe 25E253 RX 6750 XT target.
+inline bool isTarget(bool isTahoe, const char *osBuild, uint32_t deviceId, uint32_t pciRevision,
+    bool diagnosticsRequested) {
+    return isTahoe && osBuild != nullptr && strcmp(osBuild, "25E253") == 0 && deviceId == 0x73DF &&
+           pciRevision == 0xC0 && diagnosticsRequested;
 }
 
 }    // namespace DCCDiagnosticsPolicy

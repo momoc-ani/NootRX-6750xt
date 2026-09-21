@@ -201,8 +201,9 @@ WindowServer watchdog event.
 
 ### Tahoe RX 6750 XT DCC root-cause diagnostics
 
-On Tahoe with `0x73DF/0xC0`, `-NRXPowerDiag` additionally installs four
-read-only DCC wrappers around the Apple accelerator and Framebuffer paths:
+On Tahoe build `25E253` with `0x73DF/0xC0`, `-NRXPowerDiag` additionally
+installs four read-only DCC wrappers around the Apple accelerator and
+Framebuffer paths:
 
 ```text
 AddrLib identity creation
@@ -214,7 +215,9 @@ Framebuffer request 0x1A capability query
 The wrappers call each Apple function once, preserve its inputs, outputs, and
 return value, and do not change the `GPUDCCDisplayable` decision. Without
 `-NRXPowerDiag`, these routes are not installed. Other operating systems,
-device IDs, and PCI revisions are outside the target gate.
+Tahoe builds, device IDs, and PCI revisions are outside the target gate. A new
+macOS build must have its symbols, function bodies, virtual-table offsets, and
+ABI layouts revalidated before this diagnostic gate is extended.
 
 New surface combinations, changed metadata/capabilities, and failures are
 logged with the `DCCDIAG` marker. Repeated successful observations are counted

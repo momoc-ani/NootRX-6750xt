@@ -13,6 +13,8 @@
 #include <libkern/c++/OSDictionary.h>
 #include <libkern/c++/OSNumber.h>
 
+extern "C" char osversion[];
+
 static const char *pathAGDP = "/System/Library/Extensions/AppleGraphicsControl.kext/Contents/PlugIns/"
                               "AppleGraphicsDevicePolicy.kext/Contents/MacOS/AppleGraphicsDevicePolicy";
 
@@ -172,7 +174,7 @@ void NootRXMain::processPatcher(KernelPatcher &patcher) {
     this->configureDCCDisplayable();
     this->configurePowerProfile();
     this->dccDiagnostics.configure(this->dGPU,
-        DCCDiagnosticsPolicy::isTarget(getKernelVersion() == KernelVersion::Tahoe, this->deviceId,
+        DCCDiagnosticsPolicy::isTarget(getKernelVersion() == KernelVersion::Tahoe, osversion, this->deviceId,
             this->pciRevision, this->powerDiagnostics));
 
     DeviceInfo::deleter(devInfo);

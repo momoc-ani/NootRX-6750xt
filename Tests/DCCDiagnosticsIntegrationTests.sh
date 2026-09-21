@@ -49,6 +49,8 @@ preprocess_source "$main_source" "$main_effective" "$sdk_path"
 
 rg -F 'DCCDiagnosticsPolicy::isTarget(' "$main_effective" >/dev/null ||
     fail "DCC diagnostic target gate is missing"
+rg -F 'DCCDiagnosticsPolicy::isTarget(getKernelVersion() == KernelVersion::Tahoe, osversion,' \
+    "$main_effective" >/dev/null || fail "DCC diagnostics are not gated to the verified OS build"
 
 preprocess_source "$diagnostics_source" "$diagnostics_effective" "$sdk_path"
 preprocess_source "$x6000_source" "$x6000_effective" "$sdk_path"
