@@ -93,6 +93,7 @@ class NootRXMain {
     GPUDCCDisplayablePolicy dccDisplayablePolicy {GPUDCCDisplayablePolicy::stable()};
     DCCDiagnostics dccDiagnostics {};
     bool powerDiagnostics {false};
+    bool dccDiagnosticsRequested {false};
 
     X6000FB x6000fb {};
     HWLibs hwlibs {};

@@ -3,6 +3,7 @@
 
 #include "NootRX.hpp"
 #include "DDICapabilityPolicy.hpp"
+#include "DiagnosticsModePolicy.hpp"
 #include "Firmware.hpp"
 #include "Model.hpp"
 #include "PatcherPlus.hpp"
@@ -32,8 +33,12 @@ NootRXMain *NootRXMain::callback = nullptr;
 void NootRXMain::init() {
     SYSLOG("NootRX", "Copyright 2023-2024 ChefKiss. If you've paid for this, you've been scammed.");
 
-    this->powerDiagnostics = checkKernelArgument("-NRXPowerDiag");
+    const auto diagnosticsMode = DiagnosticsModePolicy::select(
+        checkKernelArgument("-NRXPowerDiag"), checkKernelArgument("-NRXDCCDiag"));
+    this->powerDiagnostics = diagnosticsMode.powerDiagnostics;
+    this->dccDiagnosticsRequested = diagnosticsMode.dccDiagnostics;
     SYSLOG_COND(this->powerDiagnostics, "NootRX", "Power diagnostics enabled by -NRXPowerDiag");
+    SYSLOG_COND(this->dccDiagnosticsRequested, "NootRX", "DCC diagnostics enabled by -NRXDCCDiag");
 
     switch (getKernelVersion()) {
         case KernelVersion::BigSur:
@@ -175,7 +180,7 @@ void NootRXMain::processPatcher(KernelPatcher &patcher) {
     this->configurePowerProfile();
     this->dccDiagnostics.configure(this->dGPU,
         DCCDiagnosticsPolicy::isTarget(getKernelVersion() == KernelVersion::Tahoe, osversion, this->deviceId,
-            this->pciRevision, this->powerDiagnostics));
+            this->pciRevision, this->dccDiagnosticsRequested));
 
     DeviceInfo::deleter(devInfo);
 

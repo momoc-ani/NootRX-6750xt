@@ -47,10 +47,18 @@ trap cleanup EXIT HUP INT TERM
 sdk_path="$(xcrun --sdk macosx --show-sdk-path)" || fail "failed to locate the macOS SDK"
 preprocess_source "$main_source" "$main_effective" "$sdk_path"
 
+rg -F 'checkKernelArgument("-NRXDCCDiag")' "$main_effective" >/dev/null ||
+    fail "independent -NRXDCCDiag boot argument is missing"
+rg -F 'DiagnosticsModePolicy::select(' "$main_effective" >/dev/null ||
+    fail "independent diagnostics mode selection is missing"
+rg -F 'this->dccDiagnosticsRequested' "$main_effective" >/dev/null ||
+    fail "DCC diagnostics request state is not stored independently"
 rg -F 'DCCDiagnosticsPolicy::isTarget(' "$main_effective" >/dev/null ||
     fail "DCC diagnostic target gate is missing"
 rg -F 'DCCDiagnosticsPolicy::isTarget(getKernelVersion() == KernelVersion::Tahoe, osversion,' \
     "$main_effective" >/dev/null || fail "DCC diagnostics are not gated to the verified OS build"
+rg -U -P -q 'DCCDiagnosticsPolicy::isTarget\((?s:.*?)this->pciRevision, this->dccDiagnosticsRequested\)' \
+    "$main_effective" || fail "DCC diagnostics still depend on the Power diagnostics request"
 
 preprocess_source "$diagnostics_source" "$diagnostics_effective" "$sdk_path"
 preprocess_source "$x6000_source" "$x6000_effective" "$sdk_path"
@@ -168,6 +176,10 @@ if ! rg -U -P -q 'wrapCallPlatformFunctionFromDrvr\((?s:.*?)callback->orgCallPla
 fi
 
 if [ -n "$binary" ]; then
+    strings -a "$binary" | rg -F -- '-NRXDCCDiag' >/dev/null ||
+        fail "built kext is missing the independent DCC diagnostics boot argument"
+    strings -a "$binary" | rg -F -- '-NRXPowerDiag' >/dev/null ||
+        fail "built kext is missing the independent Power diagnostics boot argument"
     strings -a "$binary" | rg -F 'NootRX_DCCDiagEnabled' >/dev/null ||
         fail "built kext is missing the DCC diagnostic enabled property"
     strings -a "$binary" | rg -F 'DCCDIAG' >/dev/null ||
