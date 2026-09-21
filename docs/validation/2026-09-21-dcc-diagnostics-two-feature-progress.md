@@ -55,8 +55,8 @@ Power profile: ULV=1, GFXOFF=0, FalconQuick=0, WorkLoadPolicyMask=0
 | P1 | 独立诊断模式红绿测试 | 已完成 | 四种参数组合测试退出码为 0；Power 与 DCC 状态独立 |
 | P2 | 两项功能完整主机回归 | 已完成 | 6 个 C++ 测试与 5 个 shell 集成守卫全部退出码为 0 |
 | P3 | clean Release 构建与产物校验 | 已完成 | `BUILD SUCCEEDED`；x86_64 kext、plist 与诊断标记校验通过 |
-| P4 | 远程推送与 EFI 落盘校验 | 未开始 | EFI 已挂载，等待新构建 |
-| P5 | 重启后的安全路由成功路径 | 未开始 | 需要重启 |
+| P4 | 远程推送与 EFI 落盘校验 | 已完成 | 分支已推送；EFI kext 逐文件一致，boot-args 精确计数通过 |
+| P5 | 重启后的安全路由成功路径 | 等待重启 | 新 kext 与 `-NRXDCCDiag` 已部署，尚未加载 |
 | P6 | 重启后的低开销运行观察 | 未开始 | P5 通过后开始 |
 | P7 | Displayable DCC `=1` 根因实验 | 未开始 | 不属于本轮通过条件，需用户再次确认 |
 
@@ -154,3 +154,11 @@ nootrx-gpu-dcc-displayable=1
 | 2026-09-21 18:20 +0800 | P1 | `DiagnosticsModePolicyTests` 以 `-Wall -Wextra -Werror` 编译并运行成功，四种参数组合退出码为 0 |
 | 2026-09-21 18:22 +0800 | P2 | 6 个 `Tests/*Tests.cpp` 与 5 个 `Tests/*Tests.sh` 全部运行成功，覆盖 recorder、路由、诊断隔离、DCC displayable、DDI 与 Power profile |
 | 2026-09-21 18:23 +0800 | P3 | clean Release x86_64 构建成功；`Info.plist` 为 OK；二进制集成守卫与 7 个必需标记校验通过 |
+| 2026-09-21 18:26 +0800 | P4 | 分支推送到 `origin/dcc-root-cause-diagnostics`；EFI kext 与构建目录逐文件一致；`-NRXDCCDiag=1`、`-NRXPowerDiag=0`、DCC `=0` 恰好一次；配置与 kext plist 均为 OK |
+
+P4 可恢复备份：
+
+```text
+/Volumes/NO NAME/EFI/OC/Kexts/NootRX.kext.backup-20260921-182454
+/Volumes/NO NAME/EFI/OC/config.plist.backup-20260921-182454
+```

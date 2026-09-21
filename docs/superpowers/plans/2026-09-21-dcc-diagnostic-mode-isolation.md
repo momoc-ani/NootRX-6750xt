@@ -49,10 +49,10 @@
 
 - [x] 运行全部主机测试和 shell 集成守卫。
 - [x] clean Release x86_64 构建，校验 plist 与二进制。
-- [ ] 推送 `dcc-root-cause-diagnostics`。
-- [ ] 备份 EFI 当前 kext/config，替换 kext，并只修改诊断 boot-arg。
-- [ ] 对 EFI kext、config 和参数做落盘验证。
-- [ ] 更新进度文档为“等待重启”，重新提交并推送。
+- [x] 推送 `dcc-root-cause-diagnostics`。
+- [x] 备份 EFI 当前 kext/config，替换 kext，并只修改诊断 boot-arg。
+- [x] 对 EFI kext、config 和参数做落盘验证。
+- [x] 更新进度文档为“等待重启”，重新提交并推送。
 
 ### 任务 5：重启后实机验证
 
