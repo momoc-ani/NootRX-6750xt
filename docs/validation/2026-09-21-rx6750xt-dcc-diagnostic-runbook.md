@@ -23,11 +23,24 @@ nootrx-gpu-dcc-displayable=0
 
 ```text
 NootRX_DCCDiagEnabled = 1
+NootRX_DCCDiagRouteMask = 3
+NootRX_DCCDiagFailureCode = 0
 NootRX_GPUDCCDisplayableOverride = 1
 NootRX_GPUDCCDisplayable = 0
 GPUDCCDisplayable = No
 recoveryCount = 0
 ```
+
+`NootRX_DCCDiagRouteMask` 的 bit `1` 表示 accelerator 三条路由就绪，bit `2` 表示 Framebuffer 路由就绪，因此本次完整诊断必须为 `3`。`NootRX_DCCDiagFailureCode` 含义如下：
+
+| 值 | 含义 |
+| --- | --- |
+| `0` | 无失败 |
+| `1` | 诊断锁分配失败 |
+| `2` / `3` / `4` | accelerator 符号、指令签名、路由失败 |
+| `5` / `6` / `7` | Framebuffer 符号、指令签名、路由失败 |
+
+只要 `NootRX_DCCDiagEnabled=0`、route mask 不为 `3` 或 failure code 不为 `0`，立即停止，不得进入 DCC 开启复现。符号、指令或路由不匹配时，驱动只关闭诊断，不会因此 panic；这也意味着该次启动无法提供完整证据。
 
 采集当前快照：
 
@@ -41,7 +54,8 @@ ls -lt /Library/Logs/DiagnosticReports/Kernel_*.gpuRestart /Library/Logs/Diagnos
 
 - identity 记录的 engine、family、revision 稳定；
 - 没有 `addrlib-abi` 或 `framebuffer-abi`；
-- 没有 route failure、`GFX is hung`、GPU reset 或 WindowServer watchdog；
+- route mask 为 `3`、failure code 为 `0`；
+- 没有 `GFX is hung`、GPU reset 或 WindowServer watchdog；
 - PowerPlay 四项与当前稳定配置一致。
 
 任一条件不成立时，不进入阶段二；恢复上一版 kext，并保留日志。
@@ -68,6 +82,8 @@ nootrx-gpu-dcc-displayable=1
 GPUDCCDisplayable = Yes
 NootRX_GPUDCCDisplayable = 1
 NootRX_DCCDiagEnabled = 1
+NootRX_DCCDiagRouteMask = 3
+NootRX_DCCDiagFailureCode = 0
 ```
 
 然后使用与基线相同的 Chrome 版本、默认 GPU Rasterization、相同页面、窗口尺寸和显示器连接进行复现。出现以下任一现象即停止继续操作并采集：
@@ -106,7 +122,25 @@ nootrx-gpu-dcc-displayable=0
 
 ## 证据归类
 
-按 `NootRX_DCCDiagSequence` 对齐 `identity`、`scanout`、`framebuffer`、`addrlib` 四类记录，只选择第一个出现不一致的边界：
+`NootRX_DCCDiagSnapshot` 是一次原子替换的字典，只表示最近一次发布的观察，不是完整历史。使用字典内的 `Sequence` 与 `Stage`，并结合 `DCCDIAG seq=` 日志，对齐 `identity`、`scanout`、`addrlib`、`framebuffer` 四类记录。Stage 数值为：
+
+| Stage | 类型 |
+| --- | --- |
+| `1` | AddrLib identity |
+| `2` | `shouldAllocScanoutDcc` |
+| `3` | AddrLib2 `getDccInfo2` |
+| `4` | Framebuffer request `0x1A` |
+
+快照字段按用途分为：
+
+- 顺序与状态：`Sequence`、`RepeatCount`、`Overflow`、`DuplicateCount`、`ErrorCount`、`OverflowCount`、`RouteMask`、`FailureCode`；
+- 通用观察：`Stage`、`ReturnCode`、`Width`、`Height`、`WidthBits`、`HeightBits`、`PixelFormat`、`CandidateFlags`、`Decision`；
+- ASIC identity：`ChipEngine`、`ChipFamily`、`ChipRevision`；
+- AddrLib 输入：`InputSize`、`DccKeyFlags`、`ColorFlags`、`ResourceType`、`SwizzleMode`、`Bpp`、`NumSlices`、`NumFrags`、`NumMipLevels`、`DataSurfaceSize`、`FirstMipIdInTail`；
+- AddrLib 输出：`OutputSize`、`MetaPitch`、`MetaHeight`、`MetaDepth`、`MetaSize`、`MetaAlign`、`CompressBlockWidth`、`CompressBlockHeight`、`CompressBlockDepth`、`MetaBlockWidth`、`MetaBlockHeight`、`MetaBlockDepth`、`MetaBlockSize`、`MetaBlockNumPerSlice`、`DccRamSliceSize`、`AlignmentPadding`、`MipInfoPresent`；
+- Framebuffer：`InputVersion`、`OutputVersion`、`CapabilityBits`、`CapabilityField0`、`CapabilityField1`。
+
+每个阶段使用 32 个固定槽位。新观察发布并记录一次；重复成功只在 repeat `1、2、4、8...` 更新快照而不写日志；重复失败在相同检查点同时更新快照和日志；其他重复调用不分配对象、不写 IORegistry、不写日志。按 sequence 只选择第一个出现不一致的边界：
 
 | 首个异常边界 | 后续唯一修复方向 |
 | --- | --- |

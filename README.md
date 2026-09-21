@@ -219,11 +219,39 @@ Tahoe builds, device IDs, and PCI revisions are outside the target gate. A new
 macOS build must have its symbols, function bodies, virtual-table offsets, and
 ABI layouts revalidated before this diagnostic gate is extended.
 
-New surface combinations, changed metadata/capabilities, and failures are
-logged with the `DCCDIAG` marker. Repeated successful observations are counted
-instead of being printed for every call. The diagnostic snapshot is published
-under `NootRX_DCCDiag*` on the GPU IORegistry node; it does not publish kernel
-pointers, GPU addresses, or AddrLib mip pointers.
+Before installing the wrappers, the fork resolves all four Apple symbols and
+validates the critical `25E253` instructions, including the three AddrLib
+identity getters and the Framebuffer request `0x1A` jump-table entry. A symbol,
+instruction, or route mismatch disables only DCC diagnostics; it does not
+panic the machine or change the normal NootRX graphics path.
+
+The GPU IORegistry node publishes the diagnostic state as:
+
+| Property | Meaning |
+| --- | --- |
+| `NootRX_DCCDiagEnabled` | `1` only while the target gate, lock, signatures, and installed routes remain valid |
+| `NootRX_DCCDiagRouteMask` | bit `1` = accelerator routes ready, bit `2` = Framebuffer route ready; the required value is `3` |
+| `NootRX_DCCDiagFailureCode` | `0` = none, `1` = lock allocation, `2/3/4` = accelerator symbol/signature/route, `5/6/7` = Framebuffer symbol/signature/route |
+| `NootRX_DCCDiagSnapshot` | one atomically replaced dictionary containing the latest published observation |
+
+`NootRX_DCCDiagSnapshot` contains sequence/repeat/overflow counters, route and
+failure state, stage and return code, surface dimensions and format, ASIC
+identity, the complete scalar AddrLib input/output fields, metadata geometry,
+and Framebuffer capability fields. Float dimensions are retained as raw
+`WidthBits`/`HeightBits`; `MipInfoPresent` records only pointer presence. Kernel
+pointers, GPU addresses, and the AddrLib mip pointer value are never published.
+
+Each of the four stages owns 32 fixed observation slots. A new observation is
+published and logged once. Repeated successful observations update only the
+atomic snapshot at repeat counts `1, 2, 4, 8, ...`; repeated failures both
+publish and log only at those checkpoints. Other duplicate calls perform no
+allocation, IORegistry write, or log write, which keeps the resource hot paths
+bounded during a long reproduction.
+
+Do not start a DCC-enabled reproduction unless `NootRX_DCCDiagEnabled=1`,
+`NootRX_DCCDiagRouteMask=3`, and `NootRX_DCCDiagFailureCode=0`. In particular,
+`NootRX_DCCDiagEnabled=0` is a stop condition, not an acceptable degraded
+diagnostic mode.
 
 The current stable rollback remains:
 
