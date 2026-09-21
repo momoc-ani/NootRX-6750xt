@@ -15,9 +15,12 @@
 OpenCore boot-args 保持：
 
 ```text
--NRXPowerDiag
+-NRXDCCDiag
 nootrx-gpu-dcc-displayable=0
 ```
+
+本阶段不得保留 `-NRXPowerDiag`。该参数只用于短时全量 PowerPlay/DAL
+故障抓取，不参与低开销 DCC recorder 和安全路由验证。
 
 先安装诊断 kext，但不改变当前 DCC 关闭值。重启后必须确认：
 
@@ -56,6 +59,8 @@ ls -lt /Library/Logs/DiagnosticReports/Kernel_*.gpuRestart /Library/Logs/Diagnos
 - 没有 `addrlib-abi` 或 `framebuffer-abi`；
 - route mask 为 `3`、failure code 为 `0`；
 - 没有 `GFX is hung`、GPU reset 或 WindowServer watchdog；
+- 没有 `Power diagnostics enabled by -NRXPowerDiag` 或
+  `Enabled AMDRadeonX6000 PowerPlay/DAL diagnostic logging`；
 - PowerPlay 四项与当前稳定配置一致。
 
 任一条件不成立时，不进入阶段二；恢复上一版 kext，并保留日志。

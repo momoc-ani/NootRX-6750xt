@@ -23,27 +23,27 @@
 
 ### 任务 1：独立诊断模式策略
 
-- [ ] 编写四种组合的失败测试：none、DCC-only、Power-only、both。
-- [ ] 运行测试并确认缺少策略头文件。
-- [ ] 实现最小 `DiagnosticsModePolicy::select`。
-- [ ] 运行测试确认四种组合通过。
-- [ ] 提交独立模式策略。
+- [x] 编写四种组合的失败测试：none、DCC-only、Power-only、both。
+- [x] 运行测试并确认缺少策略头文件。
+- [x] 实现最小 `DiagnosticsModePolicy::select`。
+- [x] 运行测试确认四种组合通过。
+- [x] 提交独立模式策略。
 
 ### 任务 2：NootRX boot-arg wiring
 
-- [ ] 扩展集成守卫，要求 `-NRXDCCDiag`、独立 DCC 状态和二进制标记。
-- [ ] 运行守卫并确认旧实现失败。
-- [ ] 修改 `NootRXMain`，让 `-NRXPowerDiag` 与 `-NRXDCCDiag` 分别驱动各自状态。
-- [ ] 运行模式测试、DCC 策略测试与集成守卫。
-- [ ] 提交 boot-arg wiring。
+- [x] 扩展集成守卫，要求 `-NRXDCCDiag`、独立 DCC 状态和二进制标记。
+- [x] 运行守卫并确认旧实现失败。
+- [x] 修改 `NootRXMain`，让 `-NRXPowerDiag` 与 `-NRXDCCDiag` 分别驱动各自状态。
+- [x] 运行模式测试、DCC 策略测试与集成守卫。
+- [x] 提交 boot-arg wiring。
 
 ### 任务 3：测试计划与进度文档
 
-- [ ] 写明两个功能、自动化/实机边界、通过条件和停止条件。
-- [ ] 写入 17:39 GPU Reset 证据，明确 DCC 关闭仍会 reset。
-- [ ] 建立逐阶段状态表，并在每个阶段后更新证据与时间。
-- [ ] 更新 README 和原 DCC runbook 的 boot-arg。
-- [ ] 提交文档。
+- [x] 写明两个功能、自动化/实机边界、通过条件和停止条件。
+- [x] 写入 17:39 GPU Reset 证据，明确 DCC 关闭仍会 reset。
+- [x] 建立逐阶段状态表，并在每个阶段后更新证据与时间。
+- [x] 更新 README 和原 DCC runbook 的 boot-arg。
+- [x] 提交文档。
 
 ### 任务 4：完整验证、推送与 EFI 部署
 
@@ -62,4 +62,3 @@
 - [ ] 确认没有 NootRX 全量 PowerPlay/DAL enablement 日志。
 - [ ] 按正常使用观察卡顿或 reset，并在用户每次反馈后更新进度文档。
 - [ ] 基线通过后，再由用户决定是否执行 DCC `=1` 根因实验。
-

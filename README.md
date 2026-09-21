@@ -201,9 +201,8 @@ WindowServer watchdog event.
 
 ### Tahoe RX 6750 XT DCC root-cause diagnostics
 
-On Tahoe build `25E253` with `0x73DF/0xC0`, `-NRXPowerDiag` additionally
-installs four read-only DCC wrappers around the Apple accelerator and
-Framebuffer paths:
+On Tahoe build `25E253` with `0x73DF/0xC0`, `-NRXDCCDiag` installs four
+read-only DCC wrappers around the Apple accelerator and Framebuffer paths:
 
 ```text
 AddrLib identity creation
@@ -214,10 +213,19 @@ Framebuffer request 0x1A capability query
 
 The wrappers call each Apple function once, preserve its inputs, outputs, and
 return value, and do not change the `GPUDCCDisplayable` decision. Without
-`-NRXPowerDiag`, these routes are not installed. Other operating systems,
-Tahoe builds, device IDs, and PCI revisions are outside the target gate. A new
-macOS build must have its symbols, function bodies, virtual-table offsets, and
-ABI layouts revalidated before this diagnostic gate is extended.
+`-NRXDCCDiag`, these routes are not installed. Other operating systems, Tahoe
+builds, device IDs, and PCI revisions are outside the target gate. A new macOS
+build must have its symbols, function bodies, virtual-table offsets, and ABI
+layouts revalidated before this diagnostic gate is extended.
+
+`-NRXDCCDiag` does not enable the full PowerPlay/DAL logger. Keep
+`-NRXPowerDiag` for short, explicitly approved fault captures only; it can
+produce a very large log volume and is not part of the long-running DCC
+validation baseline. The stable diagnostic baseline is:
+
+```text
+-NRXDCCDiag nootrx-gpu-dcc-displayable=0
+```
 
 Before installing the wrappers, the fork resolves all four Apple symbols and
 validates the critical `25E253` instructions, including the three AddrLib

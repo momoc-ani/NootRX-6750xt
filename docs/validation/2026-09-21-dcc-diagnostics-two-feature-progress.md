@@ -52,7 +52,7 @@ Power profile: ULV=1, GFXOFF=0, FalconQuick=0, WorkLoadPolicyMask=0
 | 阶段 | 验证内容 | 当前状态 | 证据/结果 |
 | --- | --- | --- | --- |
 | P0 | 旧版卡顿与 GPU Reset 取证 | 已完成 | 17:39 报告与内核日志已读取 |
-| P1 | 独立诊断模式红绿测试 | 未开始 | 等待实现 |
+| P1 | 独立诊断模式红绿测试 | 已完成 | 四种参数组合测试退出码为 0；Power 与 DCC 状态独立 |
 | P2 | 两项功能完整主机回归 | 未开始 | 等待实现后执行 |
 | P3 | clean Release 构建与产物校验 | 未开始 | 等待实现后执行 |
 | P4 | 远程推送与 EFI 落盘校验 | 未开始 | EFI 已挂载，等待新构建 |
@@ -151,4 +151,4 @@ nootrx-gpu-dcc-displayable=1
 | --- | --- | --- |
 | 2026-09-21 | P0 | 保存 17:39 GPU Reset、channel 28 hang、channel 34 WindowServer 和 KIQ timeout 结论 |
 | 2026-09-21 | 计划建立 | 建立 P1-P7 状态与停止条件 |
-
+| 2026-09-21 18:20 +0800 | P1 | `DiagnosticsModePolicyTests` 以 `-Wall -Wextra -Werror` 编译并运行成功，四种参数组合退出码为 0 |
