@@ -366,7 +366,7 @@ git diff --check
 
 预期：只出现计划内文件或无未提交改动；不得出现 SDMA 固件和用户草稿文档。
 
-- [ ] **步骤 4：快进集成到主工作区并推送 fork**
+- [x] **步骤 4：快进集成到主工作区并推送 fork**
 
 在确认主工作区仍只保留既有的固件和用户文档改动后，运行：
 
@@ -380,6 +380,6 @@ git -C /Users/momoc/Desktop/my_project/NootRX push origin master
 
 预期：`master` 快进到功能分支，远端 fork 更新；主工作区原有 `sdma_5_2_4_ucode.bin`、SQL 草稿和黑苹果问题笔记仍保持原状态且不进入提交。
 
-- [ ] **步骤 5：交付实机测试入口**
+- [x] **步骤 5：交付实机测试入口**
 
 交付时明确：代码与构建验证不等于闪烁根因已确认。首次实机验证只增加 `nootrx-gpu-dcc-displayable=0`，重启后先核对两个 IORegistry 属性，再恢复 Chrome GPU Rasterization 默认值复现同一 Holopix 页面；出现新的 GPU Reset、GFX hang 或 WindowServer watchdog 时删除参数回滚。
