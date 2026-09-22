@@ -23,7 +23,7 @@
 
 **文件：** `Tests/GCVersionPolicyTests.sh`
 
-- [ ] **步骤 1：把测试契约改为已批准的拆分行为。**
+- [x] **步骤 1：把测试契约改为已批准的拆分行为。**
 
   测试必须拒绝当前“所有系统统一 10.3.4”的实现，并检查以下可观察契约：
 
@@ -42,7 +42,7 @@
 
   两套 `_gc_set_fw_entry_info` 版本分支、`gc_10_3_2_` 固件前缀和构建产物检查继续保留，并把成功输出更新为拆分策略。
 
-- [ ] **步骤 2：运行测试确认当前生产代码正确失败。**
+- [x] **步骤 2：运行测试确认当前生产代码正确失败。**
 
   运行：
 
@@ -52,7 +52,7 @@
 
   预期：FAIL，原因是当前 `HWLibs.cpp` 无 Tahoe 分支且没有两个 GC 版本 IORegistry 属性。若测试因脚本语法或路径错误失败，先修正测试，不修改生产代码。
 
-- [ ] **步骤 3：提交测试红灯。**
+- [x] **步骤 3：提交测试红灯。**
 
   ```sh
   git add Tests/GCVersionPolicyTests.sh
@@ -63,7 +63,7 @@
 
 **文件：** `NootRX/HWLibs.cpp`、`NootRX/HWLibs.hpp`、`NootRX/NootRX.hpp`、`NootRX/NootRX.cpp`
 
-- [ ] **步骤 1：修改 `HWLibs::processKext` 的 Navi22 分支。**
+- [x] **步骤 1：修改 `HWLibs::processKext` 的 Navi22 分支。**
 
   将现有无条件 `kGcSwInit*` 应用改为：
 
@@ -81,7 +81,7 @@
 
   保持随后 `isSonoma1404AndLater()` 与旧系统分支中的两套 `_gc_set_fw_entry_info` 补丁完全不变；不修改 PSP、SDMA、DCC、电源、DDI 或固件文件选择。
 
-- [ ] **步骤 2：增加 GC 选择发布接口。**
+- [x] **步骤 2：增加 GC 选择发布接口。**
 
   在 `NootRX.hpp` 声明并注释：
 
@@ -102,11 +102,11 @@
   }
   ```
 
-- [ ] **步骤 3：更新 `HWLibs.hpp` 注释。**
+- [x] **步骤 3：更新 `HWLibs.hpp` 注释。**
 
   明确 `kGcSwInit*` 将硬件版本映射到 10.3.4，仅用于非 Tahoe 兼容路径；Tahoe 使用硬件报告的 10.3.2 运行时，描述符兼容仍由 `_gc_set_fw_entry_info` 补丁负责。
 
-- [ ] **步骤 4：运行策略测试确认绿灯。**
+- [x] **步骤 4：运行策略测试确认绿灯。**
 
   运行：
 
@@ -116,7 +116,7 @@
 
   预期：输出 `PASS: Tahoe Navi22 keeps GC 10.3.2 runtime and GC 10.3.4 descriptor compatibility`。
 
-- [ ] **步骤 5：提交生产实现。**
+- [x] **步骤 5：提交生产实现。**
 
   ```sh
   git add NootRX/HWLibs.cpp NootRX/HWLibs.hpp NootRX/NootRX.cpp NootRX/NootRX.hpp
@@ -127,11 +127,11 @@
 
 **文件：** `README.md`
 
-- [ ] **步骤 1：替换旧的“统一 10.3.4”说明。**
+- [x] **步骤 1：替换旧的“统一 10.3.4”说明。**
 
   说明 14:50 GPU reset 的第一现场是 Metal ComputeUQ0，报告中的 `dcc_en=0` 排除了 Displayable DCC；当前修复针对 GC 10.3.2 固件与错误的 10.3.4 `_gc_sw_init` 路径错配。明确 Metal、OpenDesign、VideoToolbox 保持启用，非 Tahoe 行为不变。
 
-- [ ] **步骤 2：记录观测方式和边界。**
+- [x] **步骤 2：记录观测方式和边界。**
 
   给出 `ioreg -l -p IOService -n <GPU节点>` 中应观察到的：
 
@@ -140,7 +140,7 @@
 
   同时声明构建通过不等于长期死机已根治，实机需继续观察 GPU reset、GPU Reset failed 和 WindowServer watchdog 报告。
 
-- [ ] **步骤 3：提交文档。**
+- [x] **步骤 3：提交文档。**
 
   ```sh
   git add README.md
@@ -151,7 +151,7 @@
 
 **文件：** 构建产物 `build/Release/NootRX.kext`
 
-- [ ] **步骤 1：运行所有 C++ 测试。**
+- [x] **步骤 1：运行所有 C++ 测试。**
 
   ```sh
   for source in Tests/*Tests.cpp; do
@@ -160,7 +160,7 @@
   done
   ```
 
-- [ ] **步骤 2：运行所有 shell 守卫。**
+- [x] **步骤 2：运行所有 shell 守卫。**
 
   ```sh
   for script in Tests/*Tests.sh; do
@@ -168,13 +168,13 @@
   done
   ```
 
-- [ ] **步骤 3：构建 Release x86_64 kext。**
+- [x] **步骤 3：构建 Release x86_64 kext。**
 
   ```sh
   xcodebuild -project NootRX.xcodeproj -configuration Release -arch x86_64 clean build CODE_SIGNING_ALLOWED=NO
   ```
 
-- [ ] **步骤 4：用构建产物运行 GC 守卫。**
+- [x] **步骤 4：用构建产物运行 GC 守卫。**
 
   ```sh
   sh Tests/GCVersionPolicyTests.sh \
