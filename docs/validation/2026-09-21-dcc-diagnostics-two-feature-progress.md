@@ -57,7 +57,7 @@ Power profile: ULV=1, GFXOFF=0, FalconQuick=0, WorkLoadPolicyMask=0
 | P3 | clean Release 构建与产物校验 | 已完成 | `BUILD SUCCEEDED`；x86_64 kext、plist 与诊断标记校验通过 |
 | P4 | 远程推送与 EFI 落盘校验 | 已完成 | 分支已推送；EFI kext 逐文件一致，boot-args 精确计数通过 |
 | P5 | 重启后的安全路由成功路径 | 失败 | 新 kext 已加载，但 target gate 返回 false：`Enabled=0`、`RouteMask=0`、`FailureCode=0` |
-| P5.1 | 剩余门控输入观测版 | 等待部署 | 新增 request/build 两个只读属性；完整回归与 Release 构建通过 |
+| P5.1 | 剩余门控输入观测版 | 等待重启 | 新 kext 已写入实际启动 EFI，等待加载后读取两个属性 |
 | P6 | 重启后的低开销运行观察 | 未开始 | P5 未通过，不进入运行观察 |
 | P7 | Displayable DCC `=1` 根因实验 | 未开始 | 不属于本轮通过条件，需用户再次确认 |
 
@@ -213,3 +213,10 @@ NootRX_DCCDiagOSBuildMatch
 | 更新时间 | 阶段 | 更新 |
 | --- | --- | --- |
 | 2026-09-22 09:39 +0800 | P5.1 | 门控输入观测版完成红绿测试、完整回归和 Release 构建，等待写入实际启动 EFI |
+| 2026-09-22 09:46 +0800 | P5.1 | `disk1s1` 实际启动 EFI 已替换为 UUID `2A01CC93-6A5C-3883-8997-B432D6A5D4BF`；kext 逐文件一致，boot-args 未改变，等待重启 |
+
+P5.1 可恢复备份：
+
+```text
+/Volumes/NO NAME/EFI/OC/Kexts/NootRX.kext.backup-20260922-094532-gate-observation
+```

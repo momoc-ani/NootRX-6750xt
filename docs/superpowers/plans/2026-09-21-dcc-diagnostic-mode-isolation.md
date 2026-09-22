@@ -60,7 +60,8 @@
 - [x] 为 request/build 两个剩余门控输入增加红灯测试。
 - [x] 发布 `NootRX_DCCDiagRequested` 与 `NootRX_DCCDiagOSBuildMatch`，保持门控行为不变。
 - [x] 完成全部主机回归、集成守卫和 clean Release 构建。
-- [ ] 部署门控观测版并重启，读取两个输入属性。
+- [x] 部署门控观测版，并验证 EFI 产物与 boot-args。
+- [ ] 重启并读取两个输入属性。
 
 - [ ] 确认当前加载的 kext UUID/构建产物与 EFI 一致。
 - [ ] 确认 `-NRXDCCDiag` 存在且 `-NRXPowerDiag` 不存在。
