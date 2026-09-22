@@ -23,7 +23,7 @@
 - 修改：`Tests/DCCDiagnosticsIntegrationTests.sh:50-70`
 - 修改：`NootRX/NootRX.cpp:5-20,175-195`
 
-- [ ] **步骤 1：增加会抓住旧数据源的失败守卫**
+- [x] **步骤 1：增加会抓住旧数据源的失败守卫**
 
 在现有 `NootRX_DCCDiagOSBuildMatch` 检查后加入：
 
@@ -47,7 +47,7 @@ fi
 
 删除守卫中要求 `observeGate(osversion, ...)` 和 `isTarget(..., osversion, ...)` 的旧断言。
 
-- [ ] **步骤 2：运行守卫确认正确红灯**
+- [x] **步骤 2：运行守卫确认正确红灯**
 
 运行：
 
@@ -61,7 +61,7 @@ sh Tests/DCCDiagnosticsIntegrationTests.sh
 FAIL: DCC diagnostics do not read the IORegistry root
 ```
 
-- [ ] **步骤 3：添加最小 IORegistry build reader**
+- [x] **步骤 3：添加最小 IORegistry build reader**
 
 在 `NootRX/NootRX.cpp` 增加头文件：
 
@@ -113,7 +113,7 @@ this->dccDiagnostics.configure(this->dGPU,
         this->pciRevision, this->dccDiagnosticsRequested));
 ```
 
-- [ ] **步骤 4：运行目标测试确认绿灯**
+- [x] **步骤 4：运行目标测试确认绿灯**
 
 运行：
 
@@ -126,7 +126,7 @@ sh Tests/DCCDiagnosticsIntegrationTests.sh
 
 预期：编译、策略测试和集成守卫退出码均为 0，无警告。
 
-- [ ] **步骤 5：提交单一实现**
+- [x] **步骤 5：提交单一实现**
 
 ```sh
 git add NootRX/NootRX.cpp Tests/DCCDiagnosticsIntegrationTests.sh
@@ -140,7 +140,7 @@ git commit -m "fix: read DCC build gate from IORegistry"
 - 修改：`docs/validation/2026-09-21-dcc-diagnostics-two-feature-progress.md`
 - 已创建：`docs/superpowers/plans/2026-09-22-dcc-os-build-gate.md`
 
-- [ ] **步骤 1：更新用户文档与验证进度**
+- [x] **步骤 1：更新用户文档与验证进度**
 
 将 README 中 `NootRX_DCCDiagOSBuildMatch` 的说明从内核 `osversion` 改为：仅当
 IORegistry 根节点 `OS Build Version` 精确等于 `25E253` 时为 `1`，属性缺失时为
@@ -157,7 +157,7 @@ global osversion fallback = none
 并保留下次启动通过条件：`Requested=1`、`OSBuildMatch=1`、`Enabled=1`、
 `RouteMask=3`、`FailureCode=0`。
 
-- [ ] **步骤 2：运行全部 C++ 主机测试**
+- [x] **步骤 2：运行全部 C++ 主机测试**
 
 运行：
 
@@ -172,7 +172,7 @@ done
 
 预期：6 个测试程序全部编译并退出 0。
 
-- [ ] **步骤 3：运行全部 shell 集成守卫**
+- [x] **步骤 3：运行全部 shell 集成守卫**
 
 运行：
 
@@ -184,7 +184,7 @@ done
 
 预期：5 个脚本全部退出 0。
 
-- [ ] **步骤 4：clean Release x86_64 构建**
+- [x] **步骤 4：clean Release x86_64 构建**
 
 运行：
 
@@ -194,7 +194,7 @@ xcodebuild -project NootRX.xcodeproj -configuration Release -arch x86_64 clean b
 
 预期：退出码为 0，输出包含 `** BUILD SUCCEEDED **`。
 
-- [ ] **步骤 5：验证最终产物**
+- [x] **步骤 5：验证最终产物**
 
 运行：
 
@@ -207,7 +207,7 @@ git diff --check
 
 预期：plist 为 OK；二进制集成守卫、必需标记和 diff 检查全部通过。
 
-- [ ] **步骤 6：提交文档并推送分支**
+- [x] **步骤 6：提交文档并推送分支**
 
 ```sh
 git add README.md docs/validation/2026-09-21-dcc-diagnostics-two-feature-progress.md docs/superpowers/plans/2026-09-22-dcc-os-build-gate.md

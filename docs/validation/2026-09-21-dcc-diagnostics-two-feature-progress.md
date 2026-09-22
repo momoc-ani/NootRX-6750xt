@@ -43,6 +43,7 @@ Power profile: ULV=1, GFXOFF=0, FalconQuick=0, WorkLoadPolicyMask=0
 
 - `已完成`：有本轮新鲜命令输出或持久化报告支持；
 - `等待重启`：代码、构建和 EFI 已验证，但尚未加载；
+- `等待部署`：代码与构建已验证，但尚未替换实际启动 EFI；
 - `实机观察中`：启动条件通过，等待正常使用反馈；
 - `失败`：通过条件不满足，停止后续阶段；
 - `未开始`：前置条件尚未满足。
@@ -58,6 +59,7 @@ Power profile: ULV=1, GFXOFF=0, FalconQuick=0, WorkLoadPolicyMask=0
 | P4 | 远程推送与 EFI 落盘校验 | 已完成 | 分支已推送；EFI kext 逐文件一致，boot-args 精确计数通过 |
 | P5 | 重启后的安全路由成功路径 | 失败 | 新 kext 已加载，但 target gate 返回 false：`Enabled=0`、`RouteMask=0`、`FailureCode=0` |
 | P5.1 | 剩余门控输入观测版 | 失败 | `Requested=1`、`OSBuildMatch=0`；早期 `osversion` 精确 build gate 未通过 |
+| P5.2 | IORegistry build gate 修正版 | 等待部署 | 6 个 C++ 测试、5 个 shell 守卫、clean Release 构建与产物校验均通过 |
 | P6 | 重启后的低开销运行观察 | 未开始 | P5 未通过，不进入运行观察 |
 | P7 | Displayable DCC `=1` 根因实验 | 未开始 | 不属于本轮通过条件，需用户再次确认 |
 
@@ -222,6 +224,53 @@ P5.1 可恢复备份：
 ```text
 /Volumes/NO NAME/EFI/OC/Kexts/NootRX.kext.backup-20260922-094532-gate-observation
 ```
+
+## P5.2 IORegistry build gate 修正版
+
+经用户批准，DCC target gate 的 build 数据源改为：
+
+```text
+数据源 = IORegistry root / OS Build Version
+缺失策略 = fail closed
+global osversion fallback = none
+```
+
+`processPatcher()` 只读取一次根节点 build，并把同一个值同时传给
+`DCCDiagnosticsPolicy::observeGate()` 和 `isTarget()`。Tahoe、device ID、PCI
+revision、`-NRXDCCDiag`、符号和指令签名门控保持不变。请求诊断但属性缺失或不匹配
+时只记录拒绝原因，仍保持 `Enabled=0`。
+
+TDD 红灯为：
+
+```text
+FAIL: DCC diagnostics do not read the IORegistry root
+```
+
+加入最小实现后，`DCCDiagnosticsPolicyTests` 与
+`DCCDiagnosticsIntegrationTests.sh` 均退出 0。实际启动通过条件仍为：
+
+```text
+NootRX_DCCDiagRequested = 1
+NootRX_DCCDiagOSBuildMatch = 1
+NootRX_DCCDiagEnabled = 1
+NootRX_DCCDiagRouteMask = 3
+NootRX_DCCDiagFailureCode = 0
+```
+
+任一条件不满足都停止复现，不开启 Displayable DCC。
+
+完整验证结果：
+
+- 6 个 C++ 主机测试全部编译并退出 0；
+- 5 个 shell 集成守卫全部退出 0；
+- clean Release x86_64 输出 `BUILD SUCCEEDED`；
+- `Info.plist` 校验为 OK；
+- 最终二进制包含 `OS Build Version`、build match、enabled 与 `DCCDIAG` 标记；
+- 构建 UUID 为 `24434FEA-33DA-3208-B251-F8D0A69C8542`。
+
+| 更新时间 | 阶段 | 更新 |
+| --- | --- | --- |
+| 2026-09-22 10:57 +0800 | P5.2 | IORegistry build gate 完成红绿测试、完整回归和 Release 构建，等待用户确认后部署 EFI |
 
 ## 2026-09-22 GPU Reset 证据
 
