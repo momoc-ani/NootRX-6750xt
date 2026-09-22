@@ -195,7 +195,7 @@
 
 ### 任务 5：推送与用户挂载 EFI 后部署
 
-- [ ] **步骤 1：推送实现分支。**
+- [x] **步骤 1：推送实现分支。**
 
   ```sh
   git push origin dcc-root-cause-diagnostics
