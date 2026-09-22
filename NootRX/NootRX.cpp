@@ -371,6 +371,14 @@ void NootRXMain::publishDDICapabilitySelection(const char *propertyName, UInt32 
         DDICapabilityPolicy::FeatureCapsIndex, featureCaps);
 }
 
+// Publishes the selected GC versions to IORegistry and records the split policy in the system log.
+void NootRXMain::publishGCVersionSelection(UInt32 runtimeVersion, UInt32 descriptorVersion) {
+    this->dGPU->setProperty("NootRX_GCRuntimeVersion", runtimeVersion, 32);
+    this->dGPU->setProperty("NootRX_GCDescriptorVersion", descriptorVersion, 32);
+    SYSLOG("NootRX", "Tahoe Navi22 GC runtime split published: runtime=0x%06X descriptor=0x%06X",
+        runtimeVersion, descriptorVersion);
+}
+
 bool NootRXMain::wrapAddDrivers(void *that, OSArray *array, bool doNubMatching) {
     UInt32 driverCount = array->getCount();
     for (UInt32 driverIndex = 0; driverIndex < driverCount; driverIndex += 1) {

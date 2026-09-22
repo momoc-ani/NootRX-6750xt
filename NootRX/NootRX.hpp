@@ -80,6 +80,9 @@ class NootRXMain {
     // Publishes the selected DDI capability word for post-boot validation and logs its donor path.
     void publishDDICapabilitySelection(const char *propertyName, UInt32 donorDeviceId, const UInt32 *caps);
 
+    // Publishes the selected GC runtime and firmware descriptor versions for post-boot diagnostics.
+    void publishGCVersionSelection(UInt32 runtimeVersion, UInt32 descriptorVersion);
+
     NootRXAttributes attributes {};
     IOMemoryMap *rmmio {nullptr};
     volatile UInt32 *rmmioPtr {nullptr};

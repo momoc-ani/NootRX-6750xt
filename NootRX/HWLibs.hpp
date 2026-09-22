@@ -75,7 +75,8 @@ static const UInt8 kCosReadConfigurationSettingPatternMask[] = {0xFF, 0xFF, 0xFF
 //------ Patches ------//
 
 // Replace call in `_gc_sw_init` to `_gc_get_hw_version` with constant (0x0A0304).
-// This matches the firmware descriptor selector on every supported macOS release, including Tahoe.
+// This compatibility patch is used on non-Tahoe systems; Tahoe keeps the native
+// Navi22 GC 10.3.2 runtime and applies the descriptor mapping independently.
 static const UInt8 kGcSwInitOriginal[] = {0x7B, 0x0C, 0xE8, 0x00, 0x00, 0x00, 0x00, 0x41, 0x89, 0xC7};
 static const UInt8 kGcSwInitOriginalMask[] = {0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF};
 static const UInt8 kGcSwInitPatched[] = {0x00, 0x00, 0xB8, 0x04, 0x03, 0x0A, 0x00, 0x00, 0x00, 0x00};
