@@ -174,13 +174,13 @@ git commit -m "fix: select Navi21 GCHub for Tahoe Navi22"
 
 **文件：** `build/Release/NootRX.kext`
 
-- [ ] **步骤 1：运行所有 shell 守卫。**
+- [x] **步骤 1：运行所有 shell 守卫。**
 
 ```sh
 for script in Tests/*Tests.sh; do sh "$script"; done
 ```
 
-- [ ] **步骤 2：运行现有 C++ 测试。**
+- [x] **步骤 2：运行现有 C++ 测试。**
 
 ```sh
 for source in Tests/*Tests.cpp; do
@@ -189,19 +189,19 @@ for source in Tests/*Tests.cpp; do
 done
 ```
 
-- [ ] **步骤 3：构建 Release x86_64 kext。**
+- [x] **步骤 3：构建 Release x86_64 kext。**
 
 ```sh
 xcodebuild -project NootRX.xcodeproj -configuration Release -arch x86_64 clean build CODE_SIGNING_ALLOWED=NO
 ```
 
-- [ ] **步骤 4：检查二进制包含新诊断字符串。**
+- [x] **步骤 4：检查二进制包含新诊断字符串。**
 
 ```sh
 strings -a build/Release/NootRX.kext/Contents/MacOS/NootRX | rg 'GCHub donor|NootRX_GCHubDonor|GCHub_10_3_0'
 ```
 
-- [ ] **步骤 5：提交验证记录并推送。**
+- [x] **步骤 5：提交验证记录并推送。**
 
 ```sh
 git status --short
