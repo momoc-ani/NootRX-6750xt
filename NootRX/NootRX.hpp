@@ -83,6 +83,9 @@ class NootRXMain {
     // Publishes the selected GC runtime and firmware descriptor versions for post-boot diagnostics.
     void publishGCVersionSelection(UInt32 runtimeVersion, UInt32 descriptorVersion);
 
+    // Publishes the selected GCHub donor and concrete class for post-reset diagnosis.
+    void publishGCHubSelection(const char *donorName, const char *hubClass);
+
     NootRXAttributes attributes {};
     IOMemoryMap *rmmio {nullptr};
     volatile UInt32 *rmmioPtr {nullptr};

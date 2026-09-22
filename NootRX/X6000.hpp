@@ -22,12 +22,17 @@ class X6000 {
         AppleAddr2ComputeDccInfoOutputV1 *);
 
     mach_vm_address_t orgGetHWInfo {0};
+    mach_vm_address_t orgNewGCHub {0};
+    mach_vm_address_t donorNewGCHub {0};
     AlignManagerInitFunction orgAlignManagerInit {nullptr};
     ShouldAllocScanoutDccFunction orgShouldAllocScanoutDcc {nullptr};
     GetDccInfo2Function orgGetDccInfo2 {nullptr};
 
     // Calls the original video-context query before applying the existing device-ID compatibility value.
     static IOReturn wrapGetHWInfo(IOService *accelVideoCtx, void *hwInfo);
+
+    // Routes Tahoe Navi22's Navi23 GCHub factory to the Apple Navi21 GCHub_10_3_0 donor.
+    static void *wrapNewGCHub(void *that);
 
     // Calls the original AddrLib initialiser and records the exact create identity getters.
     static IOReturn wrapAlignManagerInit(void *that, void *hardwareInterface);

@@ -37,6 +37,21 @@ bool X6000::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sli
             this->orgGetHWInfo};
         PANIC_COND(!request.route(patcher, id, slide, size), "X6000", "Failed to route getHWInfo");
 
+        if (NootRXMain::callback->attributes.isNavi22() && getKernelVersion() == KernelVersion::Tahoe) {
+            SolveRequestPlus donorRequest {
+                "__ZN32AMDRadeonX6000_AMDNavi21Hardware8newGCHubEv", this->donorNewGCHub};
+            PANIC_COND(!donorRequest.solve(patcher, id, slide, size), "X6000",
+                "Failed to solve Navi21 GCHub donor factory");
+
+            RouteRequestPlus gchubRoute {
+                "__ZN32AMDRadeonX6000_AMDNavi23Hardware8newGCHubEv", wrapNewGCHub, this->orgNewGCHub};
+            PANIC_COND(!gchubRoute.route(patcher, id, slide, size), "X6000",
+                "Failed to route Navi23 GCHub factory");
+
+            NootRXMain::callback->publishGCHubSelection("Navi21", "AMDRadeonX6000_AMDGCHub_10_3_0");
+            SYSLOG("X6000", "Tahoe Navi22 GCHub donor: Navi21 / GCHub_10_3_0; MMHub unchanged");
+        }
+
         auto &diagnostics = NootRXMain::callback->getDCCDiagnostics();
         if (diagnostics.isEnabled()) {
             mach_vm_address_t alignManagerInitAddress = 0;
@@ -107,6 +122,16 @@ IOReturn X6000::wrapGetHWInfo(IOService *accelVideoCtx, void *hwInfo) {
     auto ret = FunctionCast(wrapGetHWInfo, callback->orgGetHWInfo)(accelVideoCtx, hwInfo);
     getMember<UInt16>(hwInfo, 0x4) = NootRXMain::callback->attributes.isNavi21() ? 0x73BF : 0x73FF;
     return ret;
+}
+
+// Calls the Apple Navi21 GCHub factory so Tahoe Navi22 receives the compatible 10.3.0 Hub class.
+void *X6000::wrapNewGCHub(void *that) {
+    PANIC_COND(callback == nullptr || callback->donorNewGCHub == 0, "X6000",
+        "Navi21 GCHub donor factory is unavailable");
+    auto *hub = FunctionCast(wrapNewGCHub, callback->donorNewGCHub)(that);
+    PANIC_COND(hub == nullptr, "X6000", "Navi21 GCHub donor factory returned null");
+    SYSLOG("X6000", "Navi21 GCHub donor factory returned GCHub_10_3_0");
+    return hub;
 }
 
 // Invokes one no-argument UInt32 getter from the Tahoe hardware-interface vtable.

@@ -77,7 +77,7 @@ git commit -m "test: require Tahoe Navi22 GCHub donor selector"
 
 **文件：** `NootRX/X6000.hpp`、`NootRX/X6000.cpp`
 
-- [ ] **步骤 1：增加 factory 地址和 wrapper 声明。**
+- [x] **步骤 1：增加 factory 地址和 wrapper 声明。**
 
 在 `X6000` 私有区域增加：
 
@@ -89,7 +89,7 @@ mach_vm_address_t donorNewGCHub {0};
 static void *wrapNewGCHub(void *that);
 ```
 
-- [ ] **步骤 2：在 Tahoe + Navi22 分支解析 donor 并安装 route。**
+- [x] **步骤 2：在 Tahoe + Navi22 分支解析 donor 并安装 route。**
 
 在 `X600::processKext` 处理 `AMDRadeonX6000` 的路径中，保留现有 HWInfo/DCC route，然后加入：
 
@@ -114,7 +114,7 @@ if (NootRXMain::callback->attributes.isNavi22() && getKernelVersion() == KernelV
 
 The factory symbols are present in Tahoe's `AMDRadeonX6000` binary; no byte-pattern fallback is added in this task.
 
-- [ ] **步骤 3：实现 wrapper。**
+- [x] **步骤 3：实现 wrapper。**
 
 ```cpp
 void *X6000::wrapNewGCHub(void *that) {
@@ -122,6 +122,7 @@ void *X6000::wrapNewGCHub(void *that) {
         "Navi21 GCHub donor factory is unavailable");
     auto *hub = FunctionCast(wrapNewGCHub, callback->donorNewGCHub)(that);
     PANIC_COND(hub == nullptr, "X6000", "Navi21 GCHub donor factory returned null");
+    SYSLOG("X6000", "Navi21 GCHub donor factory returned GCHub_10_3_0");
     return hub;
 }
 ```
@@ -132,7 +133,7 @@ The wrapper never calls the original Navi23 factory on the selected path, so no 
 
 **文件：** `NootRX/NootRX.hpp`、`NootRX/NootRX.cpp`、`README.md`
 
-- [ ] **步骤 1：增加发布接口。**
+- [x] **步骤 1：增加发布接口。**
 
 在 `NootRX.hpp` 声明：
 
@@ -157,11 +158,11 @@ void NootRXMain::publishGCHubSelection(const char *donorName, const char *hubCla
 }
 ```
 
-- [ ] **步骤 2：更新 README。**
+- [x] **步骤 2：更新 README。**
 
 记录 `NootRX_GCHubDonor=Navi21`、`NootRX_GCHubClass=AMDRadeonX6000_AMDGCHub_10_3_0`、MMHub 仍为 `AMDRadeonX6000_AMDMMHub_2_1_1`，并说明这只是 GCHub 假设验证，不宣称已经根治长期 reset。
 
-- [ ] **步骤 3：运行 GCHub 测试并提交。**
+- [x] **步骤 3：运行 GCHub 测试并提交。**
 
 ```sh
 sh Tests/GCHubPolicyTests.sh NootRX/X6000.cpp NootRX/X6000.hpp NootRX/NootRX.cpp
