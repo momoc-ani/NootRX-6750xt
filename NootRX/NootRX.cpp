@@ -10,11 +10,20 @@
 #include <Headers/kern_api.hpp>
 #include <Headers/kern_devinfo.hpp>
 #include <IOKit/IOCatalogue.h>
+#include <IOKit/IOKitKeys.h>
 #include <libkern/c++/OSBoolean.h>
 #include <libkern/c++/OSDictionary.h>
 #include <libkern/c++/OSNumber.h>
+#include <libkern/c++/OSString.h>
 
-extern "C" char osversion[];
+// Returns the OS build published by the IORegistry root, or nullptr when unavailable.
+static const char *getOSBuildVersion() {
+    auto *root = IORegistryEntry::getRegistryRoot();
+    if (root == nullptr) { return nullptr; }
+
+    auto *build = OSDynamicCast(OSString, root->getProperty(kOSBuildVersionKey));
+    return build != nullptr ? build->getCStringNoCopy() : nullptr;
+}
 
 static const char *pathAGDP = "/System/Library/Extensions/AppleGraphicsControl.kext/Contents/PlugIns/"
                               "AppleGraphicsDevicePolicy.kext/Contents/MacOS/AppleGraphicsDevicePolicy";
@@ -178,14 +187,18 @@ void NootRXMain::processPatcher(KernelPatcher &patcher) {
 
     this->configureDCCDisplayable();
     this->configurePowerProfile();
+    const auto *osBuild = getOSBuildVersion();
     const auto dccGateObservation =
-        DCCDiagnosticsPolicy::observeGate(osversion, this->dccDiagnosticsRequested);
+        DCCDiagnosticsPolicy::observeGate(osBuild, this->dccDiagnosticsRequested);
     this->dGPU->setProperty("NootRX_DCCDiagRequested",
         static_cast<UInt64>(dccGateObservation.diagnosticsRequested ? 1U : 0U), 32);
     this->dGPU->setProperty("NootRX_DCCDiagOSBuildMatch",
         static_cast<UInt64>(dccGateObservation.osBuildMatch ? 1U : 0U), 32);
+    SYSLOG_COND(this->dccDiagnosticsRequested && !dccGateObservation.osBuildMatch, "NootRX",
+        "DCC diagnostics disabled: unsupported or unavailable OS build %s",
+        osBuild != nullptr ? osBuild : "(missing)");
     this->dccDiagnostics.configure(this->dGPU,
-        DCCDiagnosticsPolicy::isTarget(getKernelVersion() == KernelVersion::Tahoe, osversion, this->deviceId,
+        DCCDiagnosticsPolicy::isTarget(getKernelVersion() == KernelVersion::Tahoe, osBuild, this->deviceId,
             this->pciRevision, this->dccDiagnosticsRequested));
 
     DeviceInfo::deleter(devInfo);

@@ -57,14 +57,25 @@ rg -F 'NootRX_DCCDiagRequested' "$main_effective" >/dev/null ||
     fail "DCC diagnostics request observation is not published"
 rg -F 'NootRX_DCCDiagOSBuildMatch' "$main_effective" >/dev/null ||
     fail "DCC diagnostics OS build observation is not published"
-rg -F 'DCCDiagnosticsPolicy::observeGate(osversion, this->dccDiagnosticsRequested)' \
-    "$main_effective" >/dev/null || fail "DCC diagnostics gate observation does not use the runtime inputs"
+rg -F 'IORegistryEntry::getRegistryRoot()' "$main_effective" >/dev/null ||
+    fail "DCC diagnostics do not read the IORegistry root"
+rg -F 'root->getProperty(kOSBuildVersionKey)' "$main_effective" >/dev/null ||
+    fail "DCC diagnostics do not read the root OS build property"
+rg -F 'const auto *osBuild = getOSBuildVersion();' "$main_effective" >/dev/null ||
+    fail "DCC diagnostics do not capture one runtime OS build value"
+rg -F 'DCCDiagnosticsPolicy::observeGate(osBuild, this->dccDiagnosticsRequested)' \
+    "$main_effective" >/dev/null || fail "DCC gate observation does not use the IORegistry build"
 rg -F 'DCCDiagnosticsPolicy::isTarget(' "$main_effective" >/dev/null ||
     fail "DCC diagnostic target gate is missing"
-rg -F 'DCCDiagnosticsPolicy::isTarget(getKernelVersion() == KernelVersion::Tahoe, osversion,' \
-    "$main_effective" >/dev/null || fail "DCC diagnostics are not gated to the verified OS build"
+rg -U -P -q 'DCCDiagnosticsPolicy::isTarget\((?s:.*?)osBuild, this->deviceId' \
+    "$main_effective" || fail "DCC target gate does not reuse the IORegistry build"
 rg -U -P -q 'DCCDiagnosticsPolicy::isTarget\((?s:.*?)this->pciRevision, this->dccDiagnosticsRequested\)' \
     "$main_effective" || fail "DCC diagnostics still depend on the Power diagnostics request"
+if rg -F 'extern "C" char osversion[]' "$main_effective" >/dev/null ||
+    rg -F 'observeGate(osversion' "$main_effective" >/dev/null ||
+    rg -U -P -q 'DCCDiagnosticsPolicy::isTarget\((?s:.*?)osversion' "$main_effective"; then
+    fail "DCC diagnostics still depend on the global osversion input"
+fi
 
 preprocess_source "$diagnostics_source" "$diagnostics_effective" "$sdk_path"
 preprocess_source "$x6000_source" "$x6000_effective" "$sdk_path"
