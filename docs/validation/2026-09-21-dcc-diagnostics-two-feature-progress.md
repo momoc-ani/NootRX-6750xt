@@ -59,7 +59,7 @@ Power profile: ULV=1, GFXOFF=0, FalconQuick=0, WorkLoadPolicyMask=0
 | P4 | 远程推送与 EFI 落盘校验 | 已完成 | 分支已推送；EFI kext 逐文件一致，boot-args 精确计数通过 |
 | P5 | 重启后的安全路由成功路径 | 失败 | 新 kext 已加载，但 target gate 返回 false：`Enabled=0`、`RouteMask=0`、`FailureCode=0` |
 | P5.1 | 剩余门控输入观测版 | 失败 | `Requested=1`、`OSBuildMatch=0`；早期 `osversion` 精确 build gate 未通过 |
-| P5.2 | IORegistry build gate 修正版 | 等待部署 | 6 个 C++ 测试、5 个 shell 守卫、clean Release 构建与产物校验均通过 |
+| P5.2 | IORegistry build gate 修正版 | 等待重启 | EFI 与构建产物逐文件一致，新 UUID 已落盘，配置和 boot-args 未改变 |
 | P6 | 重启后的低开销运行观察 | 未开始 | P5 未通过，不进入运行观察 |
 | P7 | Displayable DCC `=1` 根因实验 | 未开始 | 不属于本轮通过条件，需用户再次确认 |
 
@@ -271,6 +271,13 @@ NootRX_DCCDiagFailureCode = 0
 | 更新时间 | 阶段 | 更新 |
 | --- | --- | --- |
 | 2026-09-22 10:57 +0800 | P5.2 | IORegistry build gate 完成红绿测试、完整回归和 Release 构建，等待用户确认后部署 EFI |
+| 2026-09-22 11:09 +0800 | P5.2 | `disk1s1` 启动 EFI 已替换为 UUID `24434FEA-33DA-3208-B251-F8D0A69C8542`；kext 逐文件一致，config 与 boot-args 未改变，等待重启 |
+
+P5.2 可恢复备份：
+
+```text
+/Volumes/NO NAME/EFI/OC/Kexts/NootRX.kext.backup-20260922-110947-osbuild-gate
+```
 
 ## 2026-09-22 GPU Reset 证据
 
