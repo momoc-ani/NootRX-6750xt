@@ -41,12 +41,30 @@ GPU IDs retain the upstream behavior.
 The tradeoff is higher idle power and potentially slightly higher idle
 temperature because the deepest GPU power transitions are restricted.
 
-Tahoe uses the same Navi22 GC compatibility selector as the other supported
-macOS releases: both `_gc_sw_init` and `_gc_set_fw_entry_info` report GC 10.3.4.
-This keeps queue, KIQ, RLC setup, and firmware descriptor selection aligned
-with Tahoe's available GC Hub implementation while retaining the native Navi22
-GC 10.3.2 command processor and RLC firmware. Metal and OpenDesign
-acceleration remain enabled.
+Tahoe + Navi22 now use a split GC compatibility policy. The 14:50 GPU reset
+series first stopped a Metal `ComputeUQ0` submission from `mediaanalysisd`,
+while the first report had `dcc_en=0` and no RSMU timeout. This points to the
+GC runtime path rather than Displayable DCC. The previous implementation
+forced both `_gc_sw_init` and `_gc_set_fw_entry_info` to report GC 10.3.4 while
+loading native Navi22 GC 10.3.2 firmware. On Tahoe this fork now keeps the
+hardware-reported GC 10.3.2 runtime path for queue, KIQ, and RLC setup, and
+limits the GC 10.3.4 compatibility mapping to firmware descriptor creation.
+Earlier supported macOS releases retain the existing `_gc_sw_init` mapping.
+Metal, OpenDesign, VideoToolbox, and GPU acceleration remain enabled.
+
+For post-boot validation, the Tahoe Navi22 path publishes the selected values
+to the GPU IORegistry node:
+
+```text
+NootRX_GCRuntimeVersion = 0x0A0302
+NootRX_GCDescriptorVersion = 0x0A0304
+```
+
+The kext also logs the split selection during startup. These properties and
+build-time tests confirm that the intended patch is installed; they do not by
+themselves prove long-term immunity to GPU hangs. Continue monitoring for new
+`.gpuRestart`, `GPU Reset failed`, or WindowServer watchdog reports after
+deployment.
 
 Tahoe also keeps the native Navi23 donor DDI capability table when NootRX maps
 it to Navi22. In particular, the Tahoe-provided feature word `0x42000020` is no
