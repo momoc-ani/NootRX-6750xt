@@ -54,6 +54,14 @@
 
 ## 实机验证边界
 
+若 target gate 在进入锁、符号、签名或路由阶段前返回 false，GPU 节点额外发布两个
+只读输入观测：
+
+- `NootRX_DCCDiagRequested`：内核对 `-NRXDCCDiag` 的解析结果；
+- `NootRX_DCCDiagOSBuildMatch`：内核 `osversion` 是否精确等于 `25E253`。
+
+这两个属性只暴露现有输入，不参与修改门控结果，也不改变任何显卡路径。
+
 实机不通过篡改 Apple 驱动制造签名失败。失败关闭由主机测试翻转关键指令字节、集成守卫检查无诊断 `PANIC_COND` 来验证；实机只验证成功路径：
 
 ```text
@@ -65,4 +73,3 @@ NootRX_DCCDiagFailureCode = 0
 如果 `Enabled=0`、route mask 不为 `3` 或 failure code 不为 `0`，停止实机观察并回到代码分析。
 
 Displayable DCC 开启是单独的根因实验。只有上述两个功能在 `GPUDCCDisplayable=No` 的基线通过后，才由用户确认是否把 `nootrx-gpu-dcc-displayable=0` 改为 `1`。
-

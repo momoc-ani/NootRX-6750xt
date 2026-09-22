@@ -178,6 +178,12 @@ void NootRXMain::processPatcher(KernelPatcher &patcher) {
 
     this->configureDCCDisplayable();
     this->configurePowerProfile();
+    const auto dccGateObservation =
+        DCCDiagnosticsPolicy::observeGate(osversion, this->dccDiagnosticsRequested);
+    this->dGPU->setProperty("NootRX_DCCDiagRequested",
+        static_cast<UInt64>(dccGateObservation.diagnosticsRequested ? 1U : 0U), 32);
+    this->dGPU->setProperty("NootRX_DCCDiagOSBuildMatch",
+        static_cast<UInt64>(dccGateObservation.osBuildMatch ? 1U : 0U), 32);
     this->dccDiagnostics.configure(this->dGPU,
         DCCDiagnosticsPolicy::isTarget(getKernelVersion() == KernelVersion::Tahoe, osversion, this->deviceId,
             this->pciRevision, this->dccDiagnosticsRequested));

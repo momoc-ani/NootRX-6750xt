@@ -53,6 +53,12 @@ rg -F 'DiagnosticsModePolicy::select(' "$main_effective" >/dev/null ||
     fail "independent diagnostics mode selection is missing"
 rg -F 'this->dccDiagnosticsRequested' "$main_effective" >/dev/null ||
     fail "DCC diagnostics request state is not stored independently"
+rg -F 'NootRX_DCCDiagRequested' "$main_effective" >/dev/null ||
+    fail "DCC diagnostics request observation is not published"
+rg -F 'NootRX_DCCDiagOSBuildMatch' "$main_effective" >/dev/null ||
+    fail "DCC diagnostics OS build observation is not published"
+rg -F 'DCCDiagnosticsPolicy::observeGate(osversion, this->dccDiagnosticsRequested)' \
+    "$main_effective" >/dev/null || fail "DCC diagnostics gate observation does not use the runtime inputs"
 rg -F 'DCCDiagnosticsPolicy::isTarget(' "$main_effective" >/dev/null ||
     fail "DCC diagnostic target gate is missing"
 rg -F 'DCCDiagnosticsPolicy::isTarget(getKernelVersion() == KernelVersion::Tahoe, osversion,' \
@@ -182,6 +188,10 @@ if [ -n "$binary" ]; then
         fail "built kext is missing the independent Power diagnostics boot argument"
     strings -a "$binary" | rg -F 'NootRX_DCCDiagEnabled' >/dev/null ||
         fail "built kext is missing the DCC diagnostic enabled property"
+    strings -a "$binary" | rg -F 'NootRX_DCCDiagRequested' >/dev/null ||
+        fail "built kext is missing the DCC diagnostic request observation"
+    strings -a "$binary" | rg -F 'NootRX_DCCDiagOSBuildMatch' >/dev/null ||
+        fail "built kext is missing the DCC diagnostic OS build observation"
     strings -a "$binary" | rg -F 'DCCDIAG' >/dev/null ||
         fail "built kext is missing the DCC diagnostic log marker"
 fi

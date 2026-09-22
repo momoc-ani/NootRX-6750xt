@@ -187,11 +187,22 @@ class DCCObservationCache {
 
 namespace DCCDiagnosticsPolicy {
 
+struct GateObservation {
+    bool diagnosticsRequested;
+    bool osBuildMatch;
+};
+
+// Captures the two runtime inputs that remain ambiguous when the target gate rejects diagnostics.
+inline GateObservation observeGate(const char *osBuild, bool diagnosticsRequested) {
+    return {diagnosticsRequested, osBuild != nullptr && strcmp(osBuild, "25E253") == 0};
+}
+
 // Restricts build-specific diagnostics to the verified Tahoe 25E253 RX 6750 XT target.
 inline bool isTarget(bool isTahoe, const char *osBuild, uint32_t deviceId, uint32_t pciRevision,
     bool diagnosticsRequested) {
-    return isTahoe && osBuild != nullptr && strcmp(osBuild, "25E253") == 0 && deviceId == 0x73DF &&
-           pciRevision == 0xC0 && diagnosticsRequested;
+    const auto gate = observeGate(osBuild, diagnosticsRequested);
+    return isTahoe && gate.osBuildMatch && deviceId == 0x73DF && pciRevision == 0xC0 &&
+           gate.diagnosticsRequested;
 }
 
 }    // namespace DCCDiagnosticsPolicy

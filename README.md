@@ -237,6 +237,8 @@ The GPU IORegistry node publishes the diagnostic state as:
 
 | Property | Meaning |
 | --- | --- |
+| `NootRX_DCCDiagRequested` | raw result of parsing `-NRXDCCDiag`; `1` means the independent DCC request was seen |
+| `NootRX_DCCDiagOSBuildMatch` | `1` only when the kernel `osversion` exactly matches the verified build `25E253` |
 | `NootRX_DCCDiagEnabled` | `1` only while the target gate, lock, signatures, and installed routes remain valid |
 | `NootRX_DCCDiagRouteMask` | bit `1` = accelerator routes ready, bit `2` = Framebuffer route ready; the required value is `3` |
 | `NootRX_DCCDiagFailureCode` | `0` = none, `1` = lock allocation, `2/3/4` = accelerator symbol/signature/route, `5/6/7` = Framebuffer symbol/signature/route |

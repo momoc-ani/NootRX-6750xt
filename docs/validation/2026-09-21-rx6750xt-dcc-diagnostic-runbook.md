@@ -34,6 +34,16 @@ GPUDCCDisplayable = No
 recoveryCount = 0
 ```
 
+若 `Enabled=0`、`RouteMask=0`、`FailureCode=0`，同时读取：
+
+```text
+NootRX_DCCDiagRequested
+NootRX_DCCDiagOSBuildMatch
+```
+
+任一值为 `0` 即表示 target gate 尚未进入路由阶段，应先修复对应输入，不得绕过
+门控继续实验。
+
 `NootRX_DCCDiagRouteMask` 的 bit `1` 表示 accelerator 三条路由就绪，bit `2` 表示 Framebuffer 路由就绪，因此本次完整诊断必须为 `3`。`NootRX_DCCDiagFailureCode` 含义如下：
 
 | 值 | 含义 |

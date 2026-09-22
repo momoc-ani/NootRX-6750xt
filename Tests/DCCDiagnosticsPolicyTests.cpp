@@ -42,6 +42,25 @@ static void testDiagnosticTargetGate() {
     assert(!DCCDiagnosticsPolicy::isTarget(true, "25E253", 0x73DF, 0xC0, false));
 }
 
+// Verifies that the two runtime gate observations preserve the raw request and exact build comparison.
+static void testDiagnosticGateObservation() {
+    const auto matching = DCCDiagnosticsPolicy::observeGate("25E253", true);
+    assert(matching.diagnosticsRequested);
+    assert(matching.osBuildMatch);
+
+    const auto requestMissing = DCCDiagnosticsPolicy::observeGate("25E253", false);
+    assert(!requestMissing.diagnosticsRequested);
+    assert(requestMissing.osBuildMatch);
+
+    const auto buildMismatch = DCCDiagnosticsPolicy::observeGate("25E252", true);
+    assert(buildMismatch.diagnosticsRequested);
+    assert(!buildMismatch.osBuildMatch);
+
+    const auto buildMissing = DCCDiagnosticsPolicy::observeGate(nullptr, true);
+    assert(buildMissing.diagnosticsRequested);
+    assert(!buildMissing.osBuildMatch);
+}
+
 // Verifies that successful duplicates publish only at logarithmic repeat checkpoints without logging.
 static void testSuccessfulDuplicateUsesLogarithmicPublishCheckpoints() {
     DCCObservationCache cache;
@@ -143,6 +162,7 @@ int main() {
     testAddrLibDccOutputLayout();
     testFramebufferDccRequestLayout();
     testDiagnosticTargetGate();
+    testDiagnosticGateObservation();
     testSuccessfulDuplicateUsesLogarithmicPublishCheckpoints();
     testChangedMetadataIsLogged();
     testRepeatedFailureUsesLogarithmicCheckpoints();

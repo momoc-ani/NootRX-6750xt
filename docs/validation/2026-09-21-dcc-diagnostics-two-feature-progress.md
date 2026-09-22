@@ -57,6 +57,7 @@ Power profile: ULV=1, GFXOFF=0, FalconQuick=0, WorkLoadPolicyMask=0
 | P3 | clean Release 构建与产物校验 | 已完成 | `BUILD SUCCEEDED`；x86_64 kext、plist 与诊断标记校验通过 |
 | P4 | 远程推送与 EFI 落盘校验 | 已完成 | 分支已推送；EFI kext 逐文件一致，boot-args 精确计数通过 |
 | P5 | 重启后的安全路由成功路径 | 失败 | 新 kext 已加载，但 target gate 返回 false：`Enabled=0`、`RouteMask=0`、`FailureCode=0` |
+| P5.1 | 剩余门控输入观测版 | 等待部署 | 新增 request/build 两个只读属性；完整回归与 Release 构建通过 |
 | P6 | 重启后的低开销运行观察 | 未开始 | P5 未通过，不进入运行观察 |
 | P7 | Displayable DCC `=1` 根因实验 | 未开始 | 不属于本轮通过条件，需用户再次确认 |
 
@@ -188,3 +189,27 @@ false。现有属性只能把剩余断点缩小到以下两个输入，不能继
 
 在增加这两个门控输入的独立 IORegistry 观测前，不修改 build gate、不绕过
 target gate，也不进入 Displayable DCC `=1` 实验。
+
+## P5.1 门控输入观测版
+
+经用户批准，只增加以下只读属性：
+
+```text
+NootRX_DCCDiagRequested
+NootRX_DCCDiagOSBuildMatch
+```
+
+实现继续复用 `DCCDiagnosticsPolicy` 的精确 build 比较，`isTarget` 的五项条件和
+返回结果保持不变。TDD 红灯证据为：策略测试因缺少 `observeGate` 编译失败，集成
+守卫因 request 属性缺失失败。最小实现后的验证结果：
+
+- 6 个 C++ 主机测试退出码为 0；
+- 5 个 shell 集成守卫退出码为 0；
+- clean Release x86_64 输出 `BUILD SUCCEEDED`；
+- `Info.plist` 为 OK；
+- 构建二进制 UUID 为 `2A01CC93-6A5C-3883-8997-B432D6A5D4BF`；
+- 两个新增属性标记均存在于最终二进制。
+
+| 更新时间 | 阶段 | 更新 |
+| --- | --- | --- |
+| 2026-09-22 09:39 +0800 | P5.1 | 门控输入观测版完成红绿测试、完整回归和 Release 构建，等待写入实际启动 EFI |
