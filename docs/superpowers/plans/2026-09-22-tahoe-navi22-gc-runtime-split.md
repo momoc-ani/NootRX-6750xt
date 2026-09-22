@@ -201,11 +201,11 @@
   git push origin dcc-root-cause-diagnostics
   ```
 
-- [ ] **步骤 2：用户挂载 EFI 后确认目标路径和当前 kext 备份。**
+- [x] **步骤 2：用户挂载 EFI 后确认目标路径和当前 kext 备份。**
 
   只在用户明确表示 EFI 已挂载后读取挂载点，先检查目标 `EFI/OC/Kexts/NootRX.kext` 的修改时间与大小，再备份为同目录的 `.before-gc-runtime-split` 副本；不修改 `config.plist` 或 boot-args。
 
-- [ ] **步骤 3：复制 Release kext 并核对。**
+- [x] **步骤 3：复制 Release kext 并核对。**
 
   复制 `build/Release/NootRX.kext` 到目标 Kexts 目录，随后用 `codesign --verify`（若目标环境允许）和 `find`/`stat` 核对文件结构；不得删除用户其他 kext。
 
