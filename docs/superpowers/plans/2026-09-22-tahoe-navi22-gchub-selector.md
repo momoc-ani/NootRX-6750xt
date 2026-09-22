@@ -23,7 +23,7 @@
 
 **文件：** `Tests/GCHubPolicyTests.sh`
 
-- [ ] **步骤 1：写入最小静态契约。**
+- [x] **步骤 1：写入最小静态契约。**
 
 ```sh
 #!/bin/sh
@@ -56,7 +56,7 @@ fi
 printf '%s\n' 'PASS: Tahoe Navi22 selects the Navi21 GCHub donor without changing MMHub'
 ```
 
-- [ ] **步骤 2：运行测试确认旧代码正确失败。**
+- [x] **步骤 2：运行测试确认旧代码正确失败。**
 
 运行：
 
@@ -66,7 +66,7 @@ sh Tests/GCHubPolicyTests.sh NootRX/X6000.cpp NootRX/X6000.hpp NootRX/NootRX.cpp
 
 预期：FAIL，原因是旧代码没有 Navi21 `newGCHub` donor route 和 GCHub diagnostics；如果因脚本语法或路径错误失败，先修正测试脚本。
 
-- [ ] **步骤 3：提交红灯测试。**
+- [x] **步骤 3：提交红灯测试。**
 
 ```sh
 git add Tests/GCHubPolicyTests.sh
