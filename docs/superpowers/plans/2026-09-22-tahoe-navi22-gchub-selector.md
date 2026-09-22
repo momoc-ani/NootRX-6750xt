@@ -210,11 +210,11 @@ git push origin dcc-root-cause-diagnostics
 
 ## 任务 5：用户挂载 EFI 后部署和实机验证
 
-- [ ] **步骤 1：用户确认 EFI 已挂载后读取目标。**
+- [x] **步骤 1：用户确认 EFI 已挂载后读取目标。**
 
 检查 EFI 挂载点、`EFI/OC/Kexts/NootRX.kext` 修改时间和大小；先复制为 `.before-gchub-selector` 备份，不删除其他文件。
 
-- [ ] **步骤 2：复制新 kext。**
+- [x] **步骤 2：复制新 kext。**
 
 仅替换 `EFI/OC/Kexts/NootRX.kext`，不修改 `config.plist`、boot-args 或四项电源 workaround。
 
