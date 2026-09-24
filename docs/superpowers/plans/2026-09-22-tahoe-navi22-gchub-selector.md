@@ -218,6 +218,15 @@ git push origin dcc-root-cause-diagnostics
 
 仅替换 `EFI/OC/Kexts/NootRX.kext`，不修改 `config.plist`、boot-args 或四项电源 workaround。
 
+## 回退记录（2026-09-24）
+
+实机运行显示 Navi21 GCHub donor 使首次 Chrome GFX reset 即出现 VM
+`READ/NACK`，随后出现 GC/UMC RSMU timeout 和无应用 owner 的连续 reset。
+经用户批准，已删除 donor route、wrapper 和 `NootRX_GCHub*` 诊断属性，恢复
+Navi23 原生 `AMDGCHub_10_3_4`；其余 GC、MMHub、DCC、电源、固件和应用设置
+保持不变。验证记录见
+`docs/validation/2026-09-24-gchub-rollback.md`。
+
 - [ ] **步骤 3：重启后核对实际对象。**
 
 ```sh

@@ -379,18 +379,6 @@ void NootRXMain::publishGCVersionSelection(UInt32 runtimeVersion, UInt32 descrip
         runtimeVersion, descriptorVersion);
 }
 
-// Publishes GCHub selection to IORegistry and records the exact donor/class in the system log.
-void NootRXMain::publishGCHubSelection(const char *donorName, const char *hubClass) {
-    auto *donor = OSString::withCString(donorName);
-    auto *hub = OSString::withCString(hubClass);
-    PANIC_COND(donor == nullptr || hub == nullptr, "NootRX", "Failed to allocate GCHub diagnostic strings");
-    this->dGPU->setProperty("NootRX_GCHubDonor", donor);
-    this->dGPU->setProperty("NootRX_GCHubClass", hub);
-    donor->release();
-    hub->release();
-    SYSLOG("NootRX", "GCHub selection: donor=%s class=%s", donorName, hubClass);
-}
-
 bool NootRXMain::wrapAddDrivers(void *that, OSArray *array, bool doNubMatching) {
     UInt32 driverCount = array->getCount();
     for (UInt32 driverIndex = 0; driverIndex < driverCount; driverIndex += 1) {

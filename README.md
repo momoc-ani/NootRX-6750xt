@@ -66,31 +66,22 @@ themselves prove long-term immunity to GPU hangs. Continue monitoring for new
 `.gpuRestart`, `GPU Reset failed`, or WindowServer watchdog reports after
 deployment.
 
-### Tahoe Navi22 GCHub donor experiment
+### Tahoe Navi22 GCHub rollback
 
-Tahoe does not provide an Apple `AMDGCHub_10_3_2` class. Before this experiment,
-the RX 6750 XT was instantiated through the Navi23 hardware personality, which
-created `AMDGCHub_10_3_4` together with `AMDMMHub_2_1_1`. The first reset report
-showed a Chrome Dawn GFX hang with DCC disabled; a later reset after recovery
-showed a WindowServer address-0 VM fault. This fork therefore tests the smallest
-driver-level change first: Tahoe + Navi22 routes only the Navi23 GCHub factory to
-Apple's Navi21 `AMDGCHub_10_3_0` factory. The accelerator personality, MMHub
-(`AMDMMHub_2_1_1`), PSP/SMC/SDMA firmware, PowerPlay profile, DCC policy, Metal,
-OpenDesign, VideoToolbox, and Chrome settings remain unchanged.
+The Navi21 `AMDGCHub_10_3_0` donor experiment was reverted after the 2026-09-24
+run. With the donor enabled, the first Chrome Metal reset already contained a
+real Chrome VM `READ/NACK`, the follow-up reset recorded GC/UMC RSMU timeouts,
+and two later resets had no application owner. This was worse than the
+pre-donor baseline, so Tahoe + Navi22 now keeps Apple's native Navi23
+`AMDGCHub_10_3_4` path.
 
-After reboot, the GPU IORegistry node should contain:
-
-```text
-NootRX_GCHubDonor = Navi21
-NootRX_GCHubClass = AMDRadeonX6000_AMDGCHub_10_3_0
-```
-
-The startup log records `Tahoe Navi22 GCHub donor: Navi21 / GCHub_10_3_0; MMHub
-unchanged`. This is a single-variable root-cause experiment, not a claim that
-long-term GPU reset stability is already proven. Keep Chrome startup parameters
-empty during validation. If the kext fails to load, Metal/OpenDesign becomes
-unusable, or a reset occurs earlier, restore the EFI kext backup from before the
-GCHub selector and do not combine this test with an MMHub change.
+The rollback removes only the GCHub donor route and its diagnostic properties.
+The Navi23 accelerator personality, `AMDMMHub_2_1_1`, GC runtime/descriptor
+split, DDI capability mapping, PSP/SMC/SDMA firmware, PowerPlay workaround,
+DCC policy, Metal, OpenDesign, VideoToolbox, and Chrome settings are unchanged.
+Keep Chrome startup parameters empty while validating this baseline. New
+`.gpuRestart`, `GPU Reset failed`, or WindowServer watchdog reports should be
+compared against the 2026-09-24 donor run.
 
 Tahoe also keeps the native Navi23 donor DDI capability table when NootRX maps
 it to Navi22. In particular, the Tahoe-provided feature word `0x42000020` is no
