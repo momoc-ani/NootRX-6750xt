@@ -35,7 +35,7 @@ while [ $# -gt 0 ]; do
 done
 
 mkdir -p "$out_dir" "$out_dir/reports"
-out_file="$out_dir/gfxdiag.log"
+out_file="$out_dir/gfxdiag.log.gz"
 reports_dir="$out_dir/reports"
 
 # Reads the current dump sequence number; prints nothing while the property is absent.
@@ -43,13 +43,13 @@ currentSeq() {
     ioreg -n "$node" -l -w0 2>/dev/null | sed -n 's/.*"NootRX_GfxDiagDumpSeq" = \([0-9][0-9]*\).*/\1/p' | head -1
 }
 
-# Appends the full GPU node dump and archives new GPU restart and panic reports.
+# Appends one gzipped snapshot of the GPU node subtree and archives new GPU restart and panic reports.
 capture() {
     seq="$1"
     {
         printf '===== %s dump seq=%s =====\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$seq"
-        ioreg -n "$node" -l -w0 2>/dev/null
-    } >> "$out_file"
+        ioreg -r -n "$node" -l -w0 2>/dev/null
+    } | gzip -c >> "$out_file"
 
     for report in /Library/Logs/DiagnosticReports/Kernel_*.gpuRestart /Library/Logs/DiagnosticReports/*.panic; do
         [ -f "$report" ] || continue
