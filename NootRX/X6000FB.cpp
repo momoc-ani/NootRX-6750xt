@@ -143,8 +143,12 @@ void X6000FB::wrapDoGPUPanic(void *, char const *fmt, ...) {
     diag->recordMessage(GfxDiagTag::GpuPanic, buf);
     diag->flush("GPU panic", true);
 
+    char summary[1024];
+    diag->buildSummary(summary, sizeof(summary));
+
     DBGLOG("X6000FB", "doGPUPanic: %s", buf);
     IOSleep(10000);
+    if (summary[0] != '\0') { panic("%s | NootRX %s", buf, summary); }
     panic("%s", buf);
 }
 
@@ -203,7 +207,7 @@ void X6000FB::wrapDmLoggerWrite(void *, const UInt32 logType, const char *fmt, .
         if (failure || GfxDiagPolicy::isInterestingLogType(logType)) {
             diag->recordMessage(failure ? GfxDiagTag::LoggerFailure : GfxDiagTag::LoggerMessage, message, logType);
         }
-        if (failure) { diag->flush("driver failure marker"); }
+        if (failure) { diag->requestDump(); }
         return;
     }
 

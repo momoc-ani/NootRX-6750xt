@@ -25,7 +25,7 @@ static constexpr size_t MaxLogTypes = 40;
 // Upper bound of SMU message id counters kept for the ambient distribution.
 static constexpr size_t MaxSmuMessages = 256;
 // Heartbeat cadence in seconds; exactly one log line per interval.
-static constexpr uint64_t HeartbeatSeconds = 600;
+static constexpr uint64_t HeartbeatSeconds = 120;
 // Minimum interval between logger-triggered flushes, in seconds.
 static constexpr uint64_t FlushCooldownSeconds = 300;
 

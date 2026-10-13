@@ -40,6 +40,7 @@ void GfxDiag::configure(IOPCIDevice *provider, bool enabled) {
         thread_call_enter_delayed(
             this->heartbeatCall, mach_absolute_time() + secondsToAbsolute(GfxDiagPolicy::HeartbeatSeconds));
     }
+    this->dumpCall = thread_call_allocate_with_priority(dumpCallback, this, THREAD_CALL_PRIORITY_KERNEL);
 
     this->publishDump("configure");
 
@@ -179,6 +180,42 @@ void GfxDiag::publishDump(const char *reason) {
     dump->release();
     this->dumpSeq += 1;
     this->provider->setProperty("NootRX_GfxDiagDumpSeq", this->dumpSeq, 64);
+}
+
+void GfxDiag::buildSummary(char *out, size_t length) {
+    if (out == nullptr || length == 0) { return; }
+    out[0] = '\0';
+    if (!this->enabled || this->lock == nullptr) { return; }
+
+    size_t used = static_cast<size_t>(snprintf(out, length,
+        "events=%u dropped=%u flushes=%u probeMask=0x%X", this->storedCount, this->droppedCount, this->flushCount,
+        this->probeMask));
+
+    const auto count = this->storedCount;
+    const auto start = count == GfxDiagPolicy::RingCapacity ? this->writeIndex : 0;
+    const size_t maxEntries = 12;
+    const size_t first = count > maxEntries ? count - maxEntries : 0;
+    for (size_t index = first; index < count && used + 64 < length; index += 1) {
+        const auto &event = this->ring[(start + index) % GfxDiagPolicy::RingCapacity];
+        if (event.text[0] != '\0') {
+            used += static_cast<size_t>(
+                snprintf(out + used, length - used, " | %u:%s", event.tag, event.text));
+        } else {
+            used += static_cast<size_t>(snprintf(out + used, length - used, " | %u:%u,%u,%u,%d", event.tag,
+                event.a, event.b, event.c, static_cast<int>(event.result)));
+        }
+    }
+}
+
+void GfxDiag::requestDump() {
+    if (!this->enabled || this->dumpCall == nullptr) { return; }
+    thread_call_enter(this->dumpCall);
+}
+
+void GfxDiag::dumpCallback(thread_call_param_t param0, thread_call_param_t) {
+    auto *diag = static_cast<GfxDiag *>(param0);
+    if (diag == nullptr || !diag->enabled) { return; }
+    diag->publishDump("requested");
 }
 
 void GfxDiag::flush(const char *reason, bool force) {

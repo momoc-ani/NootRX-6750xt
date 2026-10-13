@@ -43,6 +43,26 @@ bool X6000::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sli
                 "Failed to apply Navi 22 HwlConvertChipFamily patch");
         }
 
+        auto *gfxDiag = NootRXMain::callback->getGfxDiag();
+        if (gfxDiag->isEnabled()) {
+            // Reset/hang probes: request a ring dump the moment the driver notices a hang or resets the GPU.
+            RouteRequestPlus requests[] = {
+                {"__ZN26AMDRadeonX6000_AMDHardware17dumpASICHangStateEb", wrapDumpAsicHangState,
+                    this->orgResetProbes[0]},
+                {"__ZN26AMDRadeonX6000_AMDHardware13resetHardwareEjPj", wrapResetHardware,
+                    this->orgResetProbes[1]},
+                {"__ZN29AMDRadeonX6000_AMDSWScheduler13signalTimeoutEmj", wrapSignalTimeout,
+                    this->orgResetProbes[2]},
+            };
+
+            UInt32 probeMask = 0;
+            for (size_t index = 0; index < arrsize(requests); index += 1) {
+                if (requests[index].route(patcher, id, slide, size)) { probeMask |= 1U << index; }
+            }
+            gfxDiag->record(GfxDiagTag::Boot, 0x2000, probeMask, 0);
+            SYSLOG("X6000", "Reset probe route mask: 0x%X", probeMask);
+        }
+
         return true;
     }
 
@@ -53,4 +73,29 @@ IOReturn X6000::wrapGetHWInfo(IOService *accelVideoCtx, void *hwInfo) {
     auto ret = FunctionCast(wrapGetHWInfo, callback->orgGetHWInfo)(accelVideoCtx, hwInfo);
     getMember<UInt16>(hwInfo, 0x4) = NootRXMain::callback->attributes.isNavi21() ? 0x73BF : 0x73FF;
     return ret;
+}
+
+// Records one reset-path probe event and asks for an asynchronous ring dump.
+UInt64 X6000::runResetProbe(UInt32 probe, UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
+    auto *diag = NootRXMain::callback->getGfxDiag();
+    diag->record(GfxDiagTag::ResetEvent, probe, static_cast<UInt32>(a0), static_cast<UInt32>(a1));
+    diag->requestDump();
+
+    const auto original = callback->orgResetProbes[probe];
+    if (original == 0) { return 0; }
+
+    typedef UInt64 (*ResetProbeFunc)(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
+    return reinterpret_cast<ResetProbeFunc>(original)(a0, a1, a2, a3, a4, a5);
+}
+
+UInt64 X6000::wrapDumpAsicHangState(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
+    return runResetProbe(0, a0, a1, a2, a3, a4, a5);
+}
+
+UInt64 X6000::wrapResetHardware(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
+    return runResetProbe(1, a0, a1, a2, a3, a4, a5);
+}
+
+UInt64 X6000::wrapSignalTimeout(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
+    return runResetProbe(2, a0, a1, a2, a3, a4, a5);
 }

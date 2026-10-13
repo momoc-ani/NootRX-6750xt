@@ -21,6 +21,7 @@ enum class GfxDiagTag : UInt32 {
     LoggerFailure,
     GpuPanic,
     Heartbeat,
+    ResetEvent,
 };
 
 // One fixed-size ring slot. Text is truncated and never contains kernel or GPU addresses.
@@ -61,6 +62,12 @@ class GfxDiag {
     // Publishes the current ring as one bounded IORegistry string for a user-space collector.
     void publishDump(const char *reason);
 
+    // Requests an asynchronous dump from a driver callback context that must not touch IORegistry.
+    void requestDump();
+
+    // Formats counters plus the newest events into one line for the panic payload.
+    void buildSummary(char *out, size_t length);
+
     // Reports that one diagnostic route failed; disables the recorder without panicking.
     void disable(const char *reason);
 
@@ -73,6 +80,9 @@ class GfxDiag {
 
     // Heartbeat callback that emits counters and re-arms itself.
     static void heartbeatCallback(thread_call_param_t param0, thread_call_param_t param1);
+
+    // Asynchronous dump callback used by driver-context probes.
+    static void dumpCallback(thread_call_param_t param0, thread_call_param_t param1);
 
     // Returns the seconds since boot for event timestamps.
     static UInt64 uptimeSeconds();
@@ -93,5 +103,6 @@ class GfxDiag {
     UInt64 lastFlushSeconds {0};
     bool enabled {false};
     thread_call_t heartbeatCall {nullptr};
+    thread_call_t dumpCall {nullptr};
     char dumpBuffer[GfxDiagPolicy::DumpLength] {};
 };

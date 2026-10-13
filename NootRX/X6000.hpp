@@ -16,8 +16,15 @@ class X6000 {
 
     private:
     mach_vm_address_t orgGetHWInfo {0};
+    mach_vm_address_t orgResetProbes[3] {};
 
     static IOReturn wrapGetHWInfo(IOService *accelVideoCtx, void *hwInfo);
+
+    // Read-only probes around the accelerator reset and hang-detection paths.
+    static UInt64 wrapDumpAsicHangState(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
+    static UInt64 wrapResetHardware(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
+    static UInt64 wrapSignalTimeout(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
+    static UInt64 runResetProbe(UInt32 probe, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
 };
 
 //------ Patches ------//
