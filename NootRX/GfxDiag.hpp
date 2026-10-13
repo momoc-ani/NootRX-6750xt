@@ -16,6 +16,7 @@ enum class GfxDiagTag : UInt32 {
     PspSubmit,
     SmuMessage,
     Firmware,
+    GcEvent,
     LoggerMessage,
     LoggerFailure,
     GpuPanic,

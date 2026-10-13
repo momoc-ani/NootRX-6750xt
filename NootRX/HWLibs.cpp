@@ -330,6 +330,30 @@ bool HWLibs::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sl
                 "Failed to apply debug enablement patches");
         }
 
+        auto *gfxDiag = NootRXMain::callback->getGfxDiag();
+        if (gfxDiag->isEnabled() && kextRadeonX6810HWLibs.loadIndex == id) {
+            // Read-only GC probes; each route is installed independently so a missing symbol
+            // only drops that single probe instead of disabling the whole diagnostics build.
+            RouteRequestPlus requests[] = {
+                {"_gc_setup_rlc_10_1", wrapGcSetupRlc, this->orgGcProbes[0]},
+                {"_gc_unhalt_rlc_10_1", wrapGcUnhaltRlc, this->orgGcProbes[1]},
+                {"_gc_enter_rlc_safe_mode_10_1", wrapGcEnterRlcSafeMode, this->orgGcProbes[2]},
+                {"_gc_exit_rlc_safe_mode_10_1", wrapGcExitRlcSafeMode, this->orgGcProbes[3]},
+                {"_gc_create_kiq_queue_10_1", wrapGcCreateKiqQueue, this->orgGcProbes[4]},
+                {"_gc_destroy_kiq_queue_10_1", wrapGcDestroyKiqQueue, this->orgGcProbes[5]},
+                {"_gc_check_ucode_loaded_10_1", wrapGcCheckUcodeLoaded, this->orgGcProbes[6]},
+                {"_gc_fw_backdoor_autoload_validate_10_1", wrapGcFwBackdoorAutoloadValidate,
+                    this->orgGcProbes[7]},
+            };
+
+            UInt32 probeMask = 0;
+            for (size_t index = 0; index < arrsize(requests); index += 1) {
+                if (requests[index].route(patcher, id, slide, size)) { probeMask |= 1U << index; }
+            }
+            gfxDiag->record(GfxDiagTag::Boot, 0x1000, probeMask, 0);
+            SYSLOG("HWLibs", "GC RLC/KIQ probe route mask: 0x%X", probeMask);
+        }
+
         return true;
     }
 
@@ -499,4 +523,52 @@ CAILResult HWLibs::wrapSmu1107SendMessageWithParameter(void *smum, UInt32 msgId,
         callback->orgSmu1107SendMessageWithParameter)(smum, msgId, param);
     diag->record(GfxDiagTag::SmuMessage, msgId, param, 0, static_cast<SInt32>(result));
     return result;
+}
+
+// Records entry and exit of one GC probe and forwards every argument register untouched.
+UInt64 HWLibs::runGcProbe(UInt32 probe, UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
+    auto *diag = NootRXMain::callback->getGfxDiag();
+    const auto base = probe << 8;
+    diag->record(GfxDiagTag::GcEvent, base | 0U, static_cast<UInt32>(a0));
+
+    const auto original = callback->orgGcProbes[probe];
+    if (original == 0) { return 0; }
+
+    typedef UInt64 (*GcProbeFunc)(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
+    const auto func = reinterpret_cast<GcProbeFunc>(original);
+    const auto result = func(a0, a1, a2, a3, a4, a5);
+    diag->record(GfxDiagTag::GcEvent, base | 1U, static_cast<UInt32>(a0), 0, static_cast<SInt32>(result));
+    return result;
+}
+
+UInt64 HWLibs::wrapGcSetupRlc(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
+    return runGcProbe(0, a0, a1, a2, a3, a4, a5);
+}
+
+UInt64 HWLibs::wrapGcUnhaltRlc(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
+    return runGcProbe(1, a0, a1, a2, a3, a4, a5);
+}
+
+UInt64 HWLibs::wrapGcEnterRlcSafeMode(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
+    return runGcProbe(2, a0, a1, a2, a3, a4, a5);
+}
+
+UInt64 HWLibs::wrapGcExitRlcSafeMode(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
+    return runGcProbe(3, a0, a1, a2, a3, a4, a5);
+}
+
+UInt64 HWLibs::wrapGcCreateKiqQueue(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
+    return runGcProbe(4, a0, a1, a2, a3, a4, a5);
+}
+
+UInt64 HWLibs::wrapGcDestroyKiqQueue(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
+    return runGcProbe(5, a0, a1, a2, a3, a4, a5);
+}
+
+UInt64 HWLibs::wrapGcCheckUcodeLoaded(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
+    return runGcProbe(6, a0, a1, a2, a3, a4, a5);
+}
+
+UInt64 HWLibs::wrapGcFwBackdoorAutoloadValidate(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
+    return runGcProbe(7, a0, a1, a2, a3, a4, a5);
 }
