@@ -105,6 +105,23 @@ void GfxDiag::countMessageType(UInt32 logType) {
     IOSimpleLockUnlockEnableInterrupt(this->lock, interruptState);
 }
 
+UInt32 GfxDiag::countSmuMessage(UInt32 msgId) {
+    if (!this->enabled || this->lock == nullptr || msgId >= GfxDiagPolicy::MaxSmuMessages) { return 0; }
+
+    const auto interruptState = IOSimpleLockLockDisableInterrupt(this->lock);
+    const auto previous = this->smuMessageCounters[msgId];
+    this->smuMessageCounters[msgId] = previous + 1;
+    IOSimpleLockUnlockEnableInterrupt(this->lock, interruptState);
+    return previous;
+}
+
+void GfxDiag::publishProbeMask(UInt32 mask) {
+    this->probeMask = mask;
+    if (this->provider != nullptr) {
+        this->provider->setProperty("NootRX_GfxDiagProbeMask", static_cast<UInt64>(mask), 32);
+    }
+}
+
 void GfxDiag::publishDump(const char *reason) {
     if (this->provider == nullptr || this->lock == nullptr) { return; }
 
@@ -119,11 +136,22 @@ void GfxDiag::publishDump(const char *reason) {
         reason != nullptr ? reason : "(none)", this->dumpSeq, uptimeSeconds(), count, this->droppedCount,
         this->flushCount, this->heartbeatCount));
 
+    used += static_cast<size_t>(snprintf(this->dumpBuffer + used, GfxDiagPolicy::DumpLength - used,
+        "probeMask=0x%X\n", this->probeMask));
+
     used += static_cast<size_t>(snprintf(this->dumpBuffer + used, GfxDiagPolicy::DumpLength - used, "types="));
     for (size_t type = 0; type < GfxDiagPolicy::MaxLogTypes && used < GfxDiagPolicy::DumpLength; type += 1) {
         if (this->messageTypeCounters[type] == 0) { continue; }
         used += static_cast<size_t>(snprintf(this->dumpBuffer + used, GfxDiagPolicy::DumpLength - used, "%zu:%u,",
             type, this->messageTypeCounters[type]));
+    }
+    used += static_cast<size_t>(snprintf(this->dumpBuffer + used, GfxDiagPolicy::DumpLength - used, "\n"));
+
+    used += static_cast<size_t>(snprintf(this->dumpBuffer + used, GfxDiagPolicy::DumpLength - used, "smu="));
+    for (size_t id = 0; id < GfxDiagPolicy::MaxSmuMessages && used < GfxDiagPolicy::DumpLength; id += 1) {
+        if (this->smuMessageCounters[id] == 0) { continue; }
+        used += static_cast<size_t>(snprintf(this->dumpBuffer + used, GfxDiagPolicy::DumpLength - used, "%zu:%u,",
+            id, this->smuMessageCounters[id]));
     }
     used += static_cast<size_t>(snprintf(this->dumpBuffer + used, GfxDiagPolicy::DumpLength - used, "\n"));
 

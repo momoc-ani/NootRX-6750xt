@@ -52,6 +52,12 @@ class GfxDiag {
     // Counts one driver message type even when the message itself is not kept.
     void countMessageType(UInt32 logType);
 
+    // Counts one SMU message id and returns the count observed before this call.
+    UInt32 countSmuMessage(UInt32 msgId);
+
+    // Publishes the GC probe route mask as its own property so it survives ring churn.
+    void publishProbeMask(UInt32 mask);
+
     // Publishes the current ring as one bounded IORegistry string for a user-space collector.
     void publishDump(const char *reason);
 
@@ -81,6 +87,8 @@ class GfxDiag {
     UInt32 flushCount {0};
     UInt32 heartbeatCount {0};
     UInt32 messageTypeCounters[GfxDiagPolicy::MaxLogTypes] {};
+    UInt32 smuMessageCounters[GfxDiagPolicy::MaxSmuMessages] {};
+    UInt32 probeMask {0};
     UInt64 dumpSeq {0};
     UInt64 lastFlushSeconds {0};
     bool enabled {false};

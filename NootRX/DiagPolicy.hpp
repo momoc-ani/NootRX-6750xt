@@ -19,9 +19,11 @@ static constexpr size_t RingCapacity = 1024;
 // Event text kept per ring slot.
 static constexpr size_t TextLength = 40;
 // Bounded text size of one IORegistry dump snapshot.
-static constexpr size_t DumpLength = 16384;
+static constexpr size_t DumpLength = 65536;
 // Upper bound of DAL log type counters kept for the ambient distribution.
 static constexpr size_t MaxLogTypes = 40;
+// Upper bound of SMU message id counters kept for the ambient distribution.
+static constexpr size_t MaxSmuMessages = 256;
 // Heartbeat cadence in seconds; exactly one log line per interval.
 static constexpr uint64_t HeartbeatSeconds = 600;
 // Minimum interval between logger-triggered flushes, in seconds.

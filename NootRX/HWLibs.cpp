@@ -350,6 +350,7 @@ bool HWLibs::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sl
             for (size_t index = 0; index < arrsize(requests); index += 1) {
                 if (requests[index].route(patcher, id, slide, size)) { probeMask |= 1U << index; }
             }
+            gfxDiag->publishProbeMask(probeMask);
             gfxDiag->record(GfxDiagTag::Boot, 0x1000, probeMask, 0);
             SYSLOG("HWLibs", "GC RLC/KIQ probe route mask: 0x%X", probeMask);
         }
@@ -515,13 +516,18 @@ CAILResult HWLibs::wrapPspCmdKmSubmit(void *ctx, void *cmd, void *outData, void 
 CAILResult HWLibs::wrapSmu1107SendMessageWithParameter(void *smum, UInt32 msgId, UInt32 param) {
     auto *diag = NootRXMain::callback->getGfxDiag();
     if (param == 0x10000 && (msgId == 0x2A || msgId == 0x2B)) {
-        diag->record(GfxDiagTag::SmuMessage, msgId, param, 0, kCAILResultSuccess);
+        if (diag->countSmuMessage(msgId) == 0) {
+            diag->record(GfxDiagTag::SmuMessage, msgId, param, 0, kCAILResultSuccess);
+        }
         return kCAILResultSuccess;
     }
 
     const auto result = FunctionCast(wrapSmu1107SendMessageWithParameter,
         callback->orgSmu1107SendMessageWithParameter)(smum, msgId, param);
-    diag->record(GfxDiagTag::SmuMessage, msgId, param, 0, static_cast<SInt32>(result));
+    const auto previous = diag->countSmuMessage(msgId);
+    if (previous == 0 || result != kCAILResultSuccess) {
+        diag->record(GfxDiagTag::SmuMessage, msgId, param, previous, static_cast<SInt32>(result));
+    }
     return result;
 }
 
