@@ -25,6 +25,7 @@
 		D51187F22A6FBA3B00F23522 /* X6000.hpp in Headers */ = {isa = PBXBuildFile; fileRef = D51187F02A6FBA3B00F23522 /* X6000.hpp */; };
 		D51217872A62008A00EC0BEB /* AMDCommon.hpp in Headers */ = {isa = PBXBuildFile; fileRef = D51217862A62008A00EC0BEB /* AMDCommon.hpp */; };
 		D579D09E2A629F5300A4BCCE /* NootRX.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D579D09C2A629F5300A4BCCE /* NootRX.cpp */; };
+		A1D1A6000000000000000B01 /* GfxDiag.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1D1A6000000000000000F01 /* GfxDiag.cpp */; };
 		D579D09F2A629F5300A4BCCE /* NootRX.hpp in Headers */ = {isa = PBXBuildFile; fileRef = D579D09D2A629F5300A4BCCE /* NootRX.hpp */; };
 /* End PBXBuildFile section */
 
@@ -155,6 +156,9 @@
 		D53A4C2E2AAA620400ADD844 /* gc_10_3_2_rlc_lx6_iram_ucode.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; path = gc_10_3_2_rlc_lx6_iram_ucode.bin; sourceTree = "<group>"; };
 		D579D09C2A629F5300A4BCCE /* NootRX.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NootRX.cpp; sourceTree = "<group>"; };
 		D579D09D2A629F5300A4BCCE /* NootRX.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NootRX.hpp; sourceTree = "<group>"; };
+		A1D1A6000000000000000F01 /* GfxDiag.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = GfxDiag.cpp; sourceTree = "<group>"; };
+		A1D1A6000000000000000F02 /* DiagPolicy.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = DiagPolicy.hpp; sourceTree = "<group>"; };
+		A1D1A6000000000000000F03 /* GfxDiag.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = GfxDiag.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -194,9 +198,12 @@
 				D51217862A62008A00EC0BEB /* AMDCommon.hpp */,
 				40B6A67C2A75A2B9002D8B85 /* DYLDPatches.cpp */,
 				40B6A67D2A75A2B9002D8B85 /* DYLDPatches.hpp */,
+				A1D1A6000000000000000F02 /* DiagPolicy.hpp */,
 				4095294B2A7970ED00923793 /* Firmware */,
 				4095294F2A7971CD00923793 /* Firmware.cpp */,
 				409529502A7971CD00923793 /* Firmware.hpp */,
+				A1D1A6000000000000000F01 /* GfxDiag.cpp */,
+				A1D1A6000000000000000F03 /* GfxDiag.hpp */,
 				D51187E62A6FB66800F23522 /* HWLibs.cpp */,
 				D51187E52A6FB66800F23522 /* HWLibs.hpp */,
 				1C748C2E1C21952C0024EED2 /* Info.plist */,
@@ -466,6 +473,7 @@
 				D51187ED2A6FB70700F23522 /* X6000FB.cpp in Sources */,
 				40B6A67E2A75A2B9002D8B85 /* DYLDPatches.cpp in Sources */,
 				D579D09E2A629F5300A4BCCE /* NootRX.cpp in Sources */,
+				A1D1A6000000000000000B01 /* GfxDiag.cpp in Sources */,
 				D51187E92A6FB66800F23522 /* HWLibs.cpp in Sources */,
 				4068898B2A229BF600028D22 /* PatcherPlus.cpp in Sources */,
 				CE405ED91E4A080700AA0B3D /* plugin_start.cpp in Sources */,

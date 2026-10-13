@@ -2,7 +2,9 @@
 // See LICENSE for details.
 
 #pragma once
+#include "DiagPolicy.hpp"
 #include "DYLDPatches.hpp"
+#include "GfxDiag.hpp"
 #include "HWLibs.hpp"
 #include "X6000.hpp"
 #include "X6000FB.hpp"
@@ -10,6 +12,8 @@
 #include <IOKit/acpi/IOACPIPlatformExpert.h>
 #include <IOKit/graphics/IOFramebuffer.h>
 #include <IOKit/pci/IOPCIDevice.h>
+
+class OSDictionary;
 
 class NootRXAttributes {
     UInt8 value {0};
@@ -48,7 +52,16 @@ class NootRXMain {
     void init();
     void processPatcher(KernelPatcher &patcher);
 
+    // Returns the bounded GFX/KIQ diagnostics recorder used by the patch modules.
+    GfxDiag *getGfxDiag() { return &this->gfxDiag; }
+
     private:
+    // Reads the optional PowerPlay override boot arguments before injection.
+    void configurePowerOverrides();
+
+    // Applies explicitly requested PowerPlay overrides to the injected framebuffer personality.
+    bool applyPowerOverrides(OSDictionary *driver);
+
     void ensureRMMIO();
     void processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t slide, size_t size);
 
@@ -65,6 +78,9 @@ class NootRXMain {
     UInt32 pciRevision {0};
     IOPCIDevice *dGPU {nullptr};
     mach_vm_address_t orgAddDrivers {0};
+    PowerOverridePolicy::Profile powerOverrides {};
+    GfxDiag gfxDiag {};
+    bool gfxDiagRequested {false};
 
     X6000FB x6000fb {};
     HWLibs hwlibs {};

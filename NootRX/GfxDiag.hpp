@@ -1,0 +1,88 @@
+// Copyright © 2023-2026 ChefKiss. Licensed under the Thou Shalt Not Profit License version 1.5.
+// See LICENSE for details.
+
+#pragma once
+
+#include "DiagPolicy.hpp"
+#include <Headers/kern_util.hpp>
+#include <IOKit/IOLocks.h>
+#include <kern/thread_call.h>
+
+class IOPCIDevice;
+
+// Event categories recorded by the bounded GFX/KIQ diagnostics.
+enum class GfxDiagTag : UInt32 {
+    Boot = 0,
+    PspSubmit,
+    SmuMessage,
+    Firmware,
+    LoggerMessage,
+    LoggerFailure,
+    GpuPanic,
+    Heartbeat,
+};
+
+// One fixed-size ring slot. Text is truncated and never contains kernel or GPU addresses.
+struct GfxDiagEvent {
+    UInt64 seq;
+    UInt64 uptimeSeconds;
+    UInt32 tag;
+    UInt32 a;
+    UInt32 b;
+    UInt32 c;
+    SInt32 result;
+    char text[GfxDiagPolicy::TextLength];
+};
+
+class GfxDiag {
+    public:
+    // Prepares the recorder for the detected GPU and starts the heartbeat when enabled.
+    void configure(IOPCIDevice *provider, bool enabled);
+
+    // Returns whether event recording is active.
+    bool isEnabled() const { return this->enabled; }
+
+    // Records one scalar event; a cheap no-op while the recorder is disabled.
+    void record(GfxDiagTag tag, UInt32 a, UInt32 b = 0, UInt32 c = 0, SInt32 result = 0);
+
+    // Records one driver message with its text truncated to the ring slot size.
+    void recordMessage(GfxDiagTag tag, const char *message, UInt32 a = 0);
+
+    // Counts one driver message type even when the message itself is not kept.
+    void countMessageType(UInt32 logType);
+
+    // Publishes the current ring as one bounded IORegistry string for a user-space collector.
+    void publishDump(const char *reason);
+
+    // Reports that one diagnostic route failed; disables the recorder without panicking.
+    void disable(const char *reason);
+
+    // Writes the ring plus counters to the kernel log; rate limited unless forced.
+    void flush(const char *reason, bool force = false);
+
+    private:
+    // Emits one ring slot as a compact kernel log line.
+    static void logEvent(const GfxDiagEvent &event);
+
+    // Heartbeat callback that emits counters and re-arms itself.
+    static void heartbeatCallback(thread_call_param_t param0, thread_call_param_t param1);
+
+    // Returns the seconds since boot for event timestamps.
+    static UInt64 uptimeSeconds();
+
+    IOSimpleLock *lock {nullptr};
+    IOPCIDevice *provider {nullptr};
+    GfxDiagEvent ring[GfxDiagPolicy::RingCapacity] {};
+    UInt64 nextSeq {1};
+    UInt32 writeIndex {0};
+    UInt32 storedCount {0};
+    UInt32 droppedCount {0};
+    UInt32 flushCount {0};
+    UInt32 heartbeatCount {0};
+    UInt32 messageTypeCounters[GfxDiagPolicy::MaxLogTypes] {};
+    UInt64 dumpSeq {0};
+    UInt64 lastFlushSeconds {0};
+    bool enabled {false};
+    thread_call_t heartbeatCall {nullptr};
+    char dumpBuffer[GfxDiagPolicy::DumpLength] {};
+};

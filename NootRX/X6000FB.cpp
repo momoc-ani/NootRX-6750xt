@@ -55,6 +55,20 @@ bool X6000FB::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t s
                 "Failed to route debug symbols");
         }
 
+        auto *diag = NootRXMain::callback->getGfxDiag();
+        if (diag->isEnabled() && !ADDPR(debugEnabled)) {
+            // Only the two read-only observation routes are installed; full DAL logging stays a debug feature.
+            RouteRequestPlus requests[] = {
+                {"__ZN34AMDRadeonX6000_AmdRadeonController10doGPUPanicEPKcz", wrapDoGPUPanic},
+                {"_dm_logger_write", wrapDmLoggerWrite, kDmLoggerWritePattern},
+            };
+            if (!RouteRequestPlus::routeAll(patcher, id, requests, slide, size)) {
+                diag->disable("Failed to route GFX diagnostic symbols");
+            } else {
+                diag->recordMessage(GfxDiagTag::Boot, "X6000FB diagnostic routes ready");
+            }
+        }
+
         PANIC_COND(MachInfo::setKernelWriting(true, KernelPatcher::kernelWriteLock) != KERN_SUCCESS, "X6000FB",
             "Failed to enable kernel writing");
         orgAsicCapsTable[0].familyId = AMDGPU_FAMILY_NAVI;
@@ -117,9 +131,17 @@ void X6000FB::wrapDoGPUPanic(void *, char const *fmt, ...) {
     va_list va;
     va_start(va, fmt);
     auto *buf = static_cast<char *>(IOMalloc(1000));
+    if (buf == nullptr) {
+        va_end(va);
+        panic("NootRX: GPU panic message allocation failed");
+    }
     bzero(buf, 1000);
     vsnprintf(buf, 1000, fmt, va);
     va_end(va);
+
+    auto *diag = NootRXMain::callback->getGfxDiag();
+    diag->recordMessage(GfxDiagTag::GpuPanic, buf);
+    diag->flush("GPU panic", true);
 
     DBGLOG("X6000FB", "doGPUPanic: %s", buf);
     IOSleep(10000);
@@ -164,16 +186,44 @@ constexpr static const char *LogTypes[] = {
 
 // Needed to prevent stack overflow
 void X6000FB::wrapDmLoggerWrite(void *, const UInt32 logType, const char *fmt, ...) {
+    auto *diag = NootRXMain::callback->getGfxDiag();
+    const bool debug = ADDPR(debugEnabled);
+    if (!debug && !diag->isEnabled()) { return; }
+
+    if (!debug) {
+        // Low-overhead path: format into a small stack buffer and keep one truncated ring copy.
+        char message[256];
+        va_list va;
+        va_start(va, fmt);
+        vsnprintf(message, sizeof(message), fmt, va);
+        va_end(va);
+
+        const bool failure = GfxDiagPolicy::containsFailureMarker(message);
+        diag->countMessageType(logType);
+        if (failure || GfxDiagPolicy::isInterestingLogType(logType)) {
+            diag->recordMessage(failure ? GfxDiagTag::LoggerFailure : GfxDiagTag::LoggerMessage, message, logType);
+        }
+        if (failure) { diag->flush("driver failure marker"); }
+        return;
+    }
+
     va_list va;
     va_start(va, fmt);
     auto *message = static_cast<char *>(IOMalloc(0x1000));
+    if (message == nullptr) {
+        va_end(va);
+        return;
+    }
     vsnprintf(message, 0x1000, fmt, va);
     va_end(va);
-    auto *epilogue = message[strnlen(message, 0x1000) - 1] == '\n' ? "" : "\n";
+
+    const auto length = strnlen(message, 0x1000);
+    auto *epilogue = length > 0 && message[length - 1] == '\n' ? "" : "\n";
     if (logType < arrsize(LogTypes)) {
         kprintf("[%s]\t%s%s", LogTypes[logType], message, epilogue);
     } else {
         kprintf("%s%s", message, epilogue);
     }
+
     IOFree(message, 0x1000);
 }

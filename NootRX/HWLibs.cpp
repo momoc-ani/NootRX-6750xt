@@ -219,6 +219,7 @@ bool HWLibs::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sl
                 *reinterpret_cast<UInt32 *>(block + 12) = 0x66906690;    // nop nop
                 *reinterpret_cast<UInt16 *>(block + 15) = 0x6690;        // nop
                 // 0xF lea, mov, etc.
+                NootRXMain::callback->getGfxDiag()->record(GfxDiagTag::Firmware, arg1, arg1Mask, 1);
                 return;
             }
             auto block = slide + dataOffset;
@@ -231,6 +232,7 @@ bool HWLibs::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sl
             *reinterpret_cast<UInt16 *>(block + 15) = 0xD6FF;    // call rsi
             *reinterpret_cast<UInt16 *>(block + 17) = 0x6690;    // nop
             *reinterpret_cast<UInt8 *>(block + 19) = 0x90;       // nop
+            NootRXMain::callback->getGfxDiag()->record(GfxDiagTag::Firmware, arg1, arg1Mask, 2);
         };
 
         PANIC_COND(MachInfo::setKernelWriting(true, KernelPatcher::kernelWriteLock) != KERN_SUCCESS, "HWLibs",
@@ -280,6 +282,7 @@ bool HWLibs::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sl
             const LookupPatchPlus patch {&kextRadeonX6810HWLibs, kGcSwInitOriginal, kGcSwInitOriginalMask,
                 kGcSwInitPatched, kGcSwInitPatchedMask, 1};
             PANIC_COND(!patch.apply(patcher, slide, size), "HWLibs", "Failed to apply Navi 22 gc_sw_init patch");
+            NootRXMain::callback->getGfxDiag()->recordMessage(GfxDiagTag::Boot, "GC selector runtime=0x0A0304");
             if (NootRXMain::callback->attributes.isSonoma1404AndLater()) {
                 const LookupPatchPlus patches[] = {
                     {&kextRadeonX6810HWLibs, kGcSetFwEntryInfoOriginal14_4, kGcSetFwEntryInfoOriginalMask14_4,
@@ -344,6 +347,7 @@ CAILResult HWLibs::wrapPspCmdKmSubmit(void *ctx, void *cmd, void *outData, void 
     auto &size = getMember<UInt32>(cmd, 0xC);
     auto cmdID = getMember<AMDPSPCommand>(cmd, 0x0);
     auto *data = callback->pspCommandDataField.get(ctx);
+    NootRXMain::callback->getGfxDiag()->record(GfxDiagTag::PspSubmit, static_cast<UInt32>(cmdID), size);
 
     switch (cmdID) {
         case kPSPCommandLoadTA: {
@@ -477,6 +481,7 @@ CAILResult HWLibs::wrapPspCmdKmSubmit(void *ctx, void *cmd, void *outData, void 
     }
 
     const auto &fw = getFWByName(filename);
+    NootRXMain::callback->getGfxDiag()->recordMessage(GfxDiagTag::Firmware, filename);
     memcpy(data, fw.data, fw.length);
     size = fw.length;
 
@@ -484,7 +489,14 @@ CAILResult HWLibs::wrapPspCmdKmSubmit(void *ctx, void *cmd, void *outData, void 
 }
 
 CAILResult HWLibs::wrapSmu1107SendMessageWithParameter(void *smum, UInt32 msgId, UInt32 param) {
-    if (param == 0x10000 && (msgId == 0x2A || msgId == 0x2B)) { return kCAILResultSuccess; }
-    return FunctionCast(wrapSmu1107SendMessageWithParameter, callback->orgSmu1107SendMessageWithParameter)(smum, msgId,
-        param);
+    auto *diag = NootRXMain::callback->getGfxDiag();
+    if (param == 0x10000 && (msgId == 0x2A || msgId == 0x2B)) {
+        diag->record(GfxDiagTag::SmuMessage, msgId, param, 0, kCAILResultSuccess);
+        return kCAILResultSuccess;
+    }
+
+    const auto result = FunctionCast(wrapSmu1107SendMessageWithParameter,
+        callback->orgSmu1107SendMessageWithParameter)(smum, msgId, param);
+    diag->record(GfxDiagTag::SmuMessage, msgId, param, 0, static_cast<SInt32>(result));
+    return result;
 }

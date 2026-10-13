@@ -8,6 +8,8 @@
 #include <Headers/kern_api.hpp>
 #include <Headers/kern_devinfo.hpp>
 #include <IOKit/IOCatalogue.h>
+#include <libkern/c++/OSDictionary.h>
+#include <libkern/c++/OSNumber.h>
 
 static const char *pathAGDP = "/System/Library/Extensions/AppleGraphicsControl.kext/Contents/PlugIns/"
                               "AppleGraphicsDevicePolicy.kext/Contents/MacOS/AppleGraphicsDevicePolicy";
@@ -25,6 +27,9 @@ NootRXMain *NootRXMain::callback = nullptr;
 
 void NootRXMain::init() {
     SYSLOG("NootRX", "Copyright 2023-2024 ChefKiss. If you've paid for this, you've been scammed.");
+
+    this->gfxDiagRequested = checkKernelArgument(GfxDiagPolicy::BootArg);
+    SYSLOG_COND(this->gfxDiagRequested, "NootRX", "GFX/KIQ diagnostics requested by %s", GfxDiagPolicy::BootArg);
 
     switch (getKernelVersion()) {
         case KernelVersion::BigSur:
@@ -162,6 +167,15 @@ void NootRXMain::processPatcher(KernelPatcher &patcher) {
     DBGLOG("NootRX", "isNavi22: %s", this->attributes.isNavi22() ? "yes" : "no");
     DBGLOG("NootRX", "isNavi23: %s", this->attributes.isNavi23() ? "yes" : "no");
 
+    this->configurePowerOverrides();
+
+    this->gfxDiag.configure(this->dGPU, GfxDiagPolicy::isTarget(this->gfxDiagRequested, this->deviceId));
+    if (this->gfxDiag.isEnabled()) {
+        this->gfxDiag.record(GfxDiagTag::Boot, this->deviceId, this->pciRevision, this->enumRevision);
+        SYSLOG("NootRX", "GFX diagnostics active: device=0x%04X pciRev=0x%02X enumRev=0x%X devRev=0x%X",
+            this->deviceId, this->pciRevision, this->enumRevision, this->devRevision);
+    }
+
     DeviceInfo::deleter(devInfo);
 
     this->dyldpatches.processPatcher(patcher);
@@ -210,6 +224,65 @@ static_assert(arrsize(DriverBundleIdentifiers) == arrsize(DriverBundleXMLsBigSur
 
 static UInt8 matchedDrivers = 0;
 
+void NootRXMain::configurePowerOverrides() {
+    struct Entry {
+        const char *argument;
+        PowerOverridePolicy::Field field;
+    };
+
+    static constexpr Entry entries[] = {
+        {PowerOverridePolicy::DisableULVArg, PowerOverridePolicy::Field::DisableULV},
+        {PowerOverridePolicy::GfxOffControlArg, PowerOverridePolicy::Field::GfxOffControl},
+        {PowerOverridePolicy::FalconQuickTransitionArg, PowerOverridePolicy::Field::FalconQuickTransition},
+        {PowerOverridePolicy::WorkLoadPolicyMaskArg, PowerOverridePolicy::Field::WorkLoadPolicyMask},
+    };
+
+    for (const auto &entry : entries) {
+        UInt32 value = 0;
+        if (lilu_get_boot_args(entry.argument, &value, sizeof(value))) {
+            this->powerOverrides.set(entry.field, value);
+            SYSLOG("NootRX", "PowerPlay override requested: %s=%u", entry.argument, value);
+        }
+    }
+
+    if (this->powerOverrides.any()) {
+        this->dGPU->setProperty("NootRX_PowerOverrideMask", this->powerOverrides.overrideMask, 32);
+    }
+}
+
+bool NootRXMain::applyPowerOverrides(OSDictionary *driver) {
+    if (!this->powerOverrides.any()) { return false; }
+
+    auto *properties = OSDynamicCast(OSDictionary, driver->getObject("aty_properties"));
+    if (properties == nullptr) { return false; }
+
+    struct Property {
+        PowerOverridePolicy::Field field;
+        const char *name;
+    };
+
+    static constexpr Property propertiesToWrite[] = {
+        {PowerOverridePolicy::Field::DisableULV, "PP_DisableULV"},
+        {PowerOverridePolicy::Field::GfxOffControl, "PP_GfxOffControl"},
+        {PowerOverridePolicy::Field::FalconQuickTransition, "PP_Falcon_QuickTransition_Enable"},
+        {PowerOverridePolicy::Field::WorkLoadPolicyMask, "PP_WorkLoadPolicyMask"},
+    };
+
+    bool applied = false;
+    for (const auto &property : propertiesToWrite) {
+        if (!this->powerOverrides.overridden(property.field)) { continue; }
+
+        auto *number = OSNumber::withNumber(this->powerOverrides.value(property.field), 32);
+        if (number == nullptr) { return applied; }
+        const bool stored = properties->setObject(property.name, number);
+        number->release();
+        if (!stored) { return applied; }
+        applied = true;
+    }
+
+    return applied;
+}
+
 bool NootRXMain::wrapAddDrivers(void *that, OSArray *array, bool doNubMatching) {
     UInt32 driverCount = array->getCount();
     for (UInt32 driverIndex = 0; driverIndex < driverCount; driverIndex += 1) {
@@ -250,7 +323,15 @@ bool NootRXMain::wrapAddDrivers(void *that, OSArray *array, bool doNubMatching) 
 
                 for (UInt32 injectedDriverIndex = 0; injectedDriverIndex < injectedDriverCount;
                      injectedDriverIndex += 1) {
-                    array->setObject(driverIndex, drivers->getObject(injectedDriverIndex));
+                    auto *injectedDriver = OSDynamicCast(OSDictionary, drivers->getObject(injectedDriverIndex));
+                    if (identifierIndex == 2 && injectedDriver != nullptr &&
+                        callback->applyPowerOverrides(injectedDriver)) {
+                        SYSLOG("NootRX", "Applied PowerPlay overrides (mask=0x%X)",
+                            callback->powerOverrides.overrideMask);
+                    }
+
+                    array->setObject(driverIndex, injectedDriver != nullptr ? injectedDriver
+                                                                             : drivers->getObject(injectedDriverIndex));
                     driverIndex += 1;
                     driverCount += 1;
                 }
