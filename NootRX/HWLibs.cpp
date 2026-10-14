@@ -6,6 +6,7 @@
 #include "NootRX.hpp"
 #include "PatcherPlus.hpp"
 #include <Headers/kern_api.hpp>
+#include <kern/clock.h>
 
 static const char *pathRadeonX6000HWServices =
     "/System/Library/Extensions/AMDRadeonX6000HWServices.kext/Contents/MacOS/AMDRadeonX6000HWServices";
@@ -398,7 +399,7 @@ CAILResult HWLibs::wrapPspCmdKmSubmit(void *ctx, void *cmd, void *outData, void 
                 break;
             }
 
-            return FunctionCast(wrapPspCmdKmSubmit, callback->orgPspCmdKmSubmit)(ctx, cmd, outData, outResponse);
+            return submitPspCommand(ctx, cmd, outData, outResponse);
         }
         case kPSPCommandLoadASD:
             strncpy(filename, "psp_asd.bin", 12);
@@ -406,6 +407,8 @@ CAILResult HWLibs::wrapPspCmdKmSubmit(void *ctx, void *cmd, void *outData, void 
         case kPSPCommandLoadIPFW: {
             auto *prefix = NootRXMain::callback->getGCPrefix();
             auto uCodeID = getMember<AMDUCodeID>(cmd, 0x10);
+            NootRXMain::callback->getGfxDiag()->record(GfxDiagTag::PspSubmit,
+                0x10000U | static_cast<UInt32>(uCodeID), size);
             switch (uCodeID) {
                 case kUCodeSMU:
                     if (NootRXMain::callback->attributes.isNavi21()) {
@@ -496,13 +499,12 @@ CAILResult HWLibs::wrapPspCmdKmSubmit(void *ctx, void *cmd, void *outData, void 
                     }
                     break;
                 default:
-                    return FunctionCast(wrapPspCmdKmSubmit, callback->orgPspCmdKmSubmit)(ctx, cmd, outData,
-                        outResponse);
+                    return submitPspCommand(ctx, cmd, outData, outResponse);
             }
             break;
         }
         default:
-            return FunctionCast(wrapPspCmdKmSubmit, callback->orgPspCmdKmSubmit)(ctx, cmd, outData, outResponse);
+            return submitPspCommand(ctx, cmd, outData, outResponse);
     }
 
     const auto &fw = getFWByName(filename);
@@ -510,7 +512,21 @@ CAILResult HWLibs::wrapPspCmdKmSubmit(void *ctx, void *cmd, void *outData, void 
     memcpy(data, fw.data, fw.length);
     size = fw.length;
 
-    return FunctionCast(wrapPspCmdKmSubmit, callback->orgPspCmdKmSubmit)(ctx, cmd, outData, outResponse);
+    return submitPspCommand(ctx, cmd, outData, outResponse);
+}
+
+// Forwards one PSP command to the original implementation and records duration plus result.
+CAILResult HWLibs::submitPspCommand(void *ctx, void *cmd, void *outData, void *outResponse) {
+    auto *diag = NootRXMain::callback->getGfxDiag();
+    const auto cmdID = getMember<AMDPSPCommand>(cmd, 0x0);
+    const auto start = mach_absolute_time();
+    const auto result = FunctionCast(submitPspCommand, callback->orgPspCmdKmSubmit)(ctx, cmd, outData, outResponse);
+    UInt64 elapsedNs = 0;
+    absolutetime_to_nanoseconds(mach_absolute_time() - start, &elapsedNs);
+
+    diag->record(GfxDiagTag::PspSubmit, static_cast<UInt32>(cmdID) | 0x8000U, static_cast<UInt32>(elapsedNs / 1000000ULL),
+        static_cast<UInt32>(elapsedNs / 1000ULL) & 0xFFFFU, static_cast<SInt32>(result));
+    return result;
 }
 
 CAILResult HWLibs::wrapSmu1107SendMessageWithParameter(void *smum, UInt32 msgId, UInt32 param) {

@@ -23,6 +23,7 @@ class HWLibs {
 
     static const char *wrapGetMatchProperty(void);
     static CAILResult wrapPspCmdKmSubmit(void *ctx, void *cmd, void *outData, void *outResponse);
+    static CAILResult submitPspCommand(void *ctx, void *cmd, void *outData, void *outResponse);
     static CAILResult wrapSmu1107SendMessageWithParameter(void *smum, UInt32 msgId, UInt32 param);
 
     // Read-only GC probes around the RLC and KIQ paths; each one forwards all integer
