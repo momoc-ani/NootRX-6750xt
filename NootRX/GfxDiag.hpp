@@ -87,7 +87,7 @@ class GfxDiag {
     // Publishes the GC probe route mask as its own property so it survives ring churn.
     void publishProbeMask(UInt32 mask);
 
-    // Records per-channel pending-submission transitions: busy on 0 -> 1, idle on 1 -> 0.
+    // Records per-channel pending submissions for the one-second stall checker.
     void channelSubmit(UInt64 channel);
     void channelComplete(UInt64 channel);
 
@@ -119,6 +119,9 @@ class GfxDiag {
     // Asynchronous dump callback used by driver-context probes.
     static void dumpCallback(thread_call_param_t param0, thread_call_param_t param1);
 
+    // One-second stall checker: reports channels that stay busy and work-signal rates.
+    static void stallCheckCallback(thread_call_param_t param0, thread_call_param_t param1);
+
     // Returns the seconds since boot for event timestamps.
     static UInt64 uptimeSeconds();
 
@@ -140,12 +143,16 @@ class GfxDiag {
     UInt64 channelKeys[ChannelSlots] {};
     UInt32 channelPending[ChannelSlots] {};
     UInt32 channelSubmits[ChannelSlots] {};
+    UInt64 channelBusyStart[ChannelSlots] {};
+    UInt32 workSubmittedCount {0};
+    UInt32 workSubmittedReported {0};
     UInt32 probeMask {0};
     UInt64 dumpSeq {0};
     UInt64 lastFlushSeconds {0};
     bool enabled {false};
     thread_call_t heartbeatCall {nullptr};
     thread_call_t dumpCall {nullptr};
+    thread_call_t checkCall {nullptr};
     char dumpBuffer[GfxDiagPolicy::DumpLength] {};
 };
 

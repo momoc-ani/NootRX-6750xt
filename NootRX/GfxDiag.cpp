@@ -43,6 +43,10 @@ void GfxDiag::configure(IOPCIDevice *provider, bool enabled) {
             this->heartbeatCall, mach_absolute_time() + secondsToAbsolute(GfxDiagPolicy::HeartbeatSeconds));
     }
     this->dumpCall = thread_call_allocate_with_priority(dumpCallback, this, THREAD_CALL_PRIORITY_KERNEL);
+    this->checkCall = thread_call_allocate_with_priority(stallCheckCallback, this, THREAD_CALL_PRIORITY_KERNEL);
+    if (this->checkCall != nullptr) {
+        thread_call_enter_delayed(this->checkCall, mach_absolute_time() + secondsToAbsolute(1));
+    }
 
     this->publishDump("configure");
 
@@ -145,19 +149,14 @@ void GfxDiag::channelSubmit(UInt64 channel) {
 
     const auto interruptState = IOSimpleLockLockDisableInterrupt(this->lock);
     const auto index = channelIndexLocked(channel);
-    bool becameBusy = false;
-    UInt32 submits = 0;
     if (index != 0xFFFFFFFFU) {
         this->channelPending[index] += 1;
         if (this->channelPending[index] == 1) {
             this->channelSubmits[index] += 1;
-            becameBusy = true;
-            submits = this->channelSubmits[index];
+            this->channelBusyStart[index] = uptimeSeconds();
         }
     }
     IOSimpleLockUnlockEnableInterrupt(this->lock, interruptState);
-
-    if (becameBusy) { this->record(GfxDiagTag::QueueEvent, index, submits, 1); }
 }
 
 void GfxDiag::channelComplete(UInt64 channel) {
@@ -166,22 +165,27 @@ void GfxDiag::channelComplete(UInt64 channel) {
     const auto interruptState = IOSimpleLockLockDisableInterrupt(this->lock);
     const auto index = channelIndexLocked(channel);
     bool becameIdle = false;
-    UInt32 submits = 0;
+    UInt32 busySeconds = 0;
     if (index != 0xFFFFFFFFU && this->channelPending[index] > 0) {
         this->channelPending[index] -= 1;
         if (this->channelPending[index] == 0) {
             becameIdle = true;
-            submits = this->channelSubmits[index];
+            const auto now = uptimeSeconds();
+            if (now > this->channelBusyStart[index]) { busySeconds = static_cast<UInt32>(now - this->channelBusyStart[index]); }
         }
     }
     IOSimpleLockUnlockEnableInterrupt(this->lock, interruptState);
 
-    if (becameIdle) { this->record(GfxDiagTag::QueueEvent, index, submits, 0); }
+    // Only long-running jobs are reported; short submit/complete pairs stay uncounted.
+    if (becameIdle && busySeconds >= 2) { this->record(GfxDiagTag::QueueEvent, index, busySeconds, 4); }
 }
 
 void GfxDiag::noteWorkSubmitted() {
-    if (!this->enabled) { return; }
-    this->record(GfxDiagTag::QueueEvent, 0xFFFFU, 0, 2);
+    if (!this->enabled || this->lock == nullptr) { return; }
+
+    const auto interruptState = IOSimpleLockLockDisableInterrupt(this->lock);
+    this->workSubmittedCount += 1;
+    IOSimpleLockUnlockEnableInterrupt(this->lock, interruptState);
 }
 
 void GfxDiag::publishDump(const char *reason) {
@@ -277,6 +281,39 @@ void GfxDiag::dumpCallback(thread_call_param_t param0, thread_call_param_t) {
     auto *diag = static_cast<GfxDiag *>(param0);
     if (diag == nullptr || !diag->enabled) { return; }
     diag->publishDump("requested");
+}
+
+void GfxDiag::stallCheckCallback(thread_call_param_t param0, thread_call_param_t) {
+    auto *diag = static_cast<GfxDiag *>(param0);
+    if (diag == nullptr || !diag->enabled) { return; }
+
+    const auto now = uptimeSeconds();
+    UInt64 busySeconds[ChannelSlots] = {};
+    UInt32 pending[ChannelSlots] = {};
+    UInt32 submits[ChannelSlots] = {};
+    UInt32 workCount = 0;
+
+    const auto interruptState = IOSimpleLockLockDisableInterrupt(diag->lock);
+    for (UInt32 index = 0; index < ChannelSlots; index += 1) {
+        pending[index] = diag->channelPending[index];
+        submits[index] = diag->channelSubmits[index];
+        if (pending[index] > 0 && now > diag->channelBusyStart[index]) {
+            busySeconds[index] = now - diag->channelBusyStart[index];
+        }
+    }
+    workCount = diag->workSubmittedCount - diag->workSubmittedReported;
+    diag->workSubmittedReported = diag->workSubmittedCount;
+    IOSimpleLockUnlockEnableInterrupt(diag->lock, interruptState);
+
+    for (UInt32 index = 0; index < ChannelSlots; index += 1) {
+        if (pending[index] == 0 || busySeconds[index] < 3) { continue; }
+        diag->record(GfxDiagTag::QueueEvent, index, static_cast<UInt32>(busySeconds[index]), 3);
+    }
+    if (workCount > 0) { diag->record(GfxDiagTag::QueueEvent, 0xFFFFU, workCount, 2); }
+
+    if (diag->checkCall != nullptr) {
+        thread_call_enter_delayed(diag->checkCall, mach_absolute_time() + secondsToAbsolute(1));
+    }
 }
 
 void GfxDiag::flush(const char *reason, bool force) {
