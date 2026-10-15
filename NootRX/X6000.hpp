@@ -2,6 +2,7 @@
 // See LICENSE for details.
 
 #pragma once
+#include "DiagPolicy.hpp"
 #include <Headers/kern_patcher.hpp>
 #include <Headers/kern_util.hpp>
 #include <IOKit/IOService.h>
@@ -16,11 +17,14 @@ class X6000 {
 
     private:
     mach_vm_address_t orgGetHWInfo {0};
+#if NOOTRX_GFX_DIAG
     mach_vm_address_t orgResetProbes[3] {};
     mach_vm_address_t orgQueueProbes[3] {};
+#endif
 
     static IOReturn wrapGetHWInfo(IOService *accelVideoCtx, void *hwInfo);
 
+#if NOOTRX_GFX_DIAG
     // Read-only probes around the accelerator reset and hang-detection paths.
     static UInt64 wrapDumpAsicHangState(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
     static UInt64 wrapResetHardware(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
@@ -32,6 +36,7 @@ class X6000 {
     static UInt64 wrapChannelComplete(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
     static UInt64 wrapWorkSubmitted(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
     static UInt64 runQueueProbe(UInt32 probe, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
+#endif    // NOOTRX_GFX_DIAG
 };
 
 //------ Patches ------//

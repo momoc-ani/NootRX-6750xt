@@ -8,6 +8,8 @@
 #include <kern/clock.h>
 #include <libkern/c++/OSString.h>
 
+#if NOOTRX_GFX_DIAG
+
 // Converts whole seconds to absolute time units for thread call deadlines and rate limits.
 static UInt64 secondsToAbsolute(UInt64 seconds) {
     UInt64 absolute = 0;
@@ -347,3 +349,5 @@ UInt64 GfxDiag::uptimeSeconds() {
     absolutetime_to_nanoseconds(mach_absolute_time(), &nanoseconds);
     return nanoseconds / 1000000000ULL;
 }
+
+#endif    // NOOTRX_GFX_DIAG

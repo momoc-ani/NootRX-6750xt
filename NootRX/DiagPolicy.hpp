@@ -6,6 +6,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// The GFX/KIQ diagnostics stack is compiled into debug builds only; release builds
+// stay free of probe routes, ring memory and IORegistry records.
+#if defined(DEBUG) && DEBUG
+#define NOOTRX_GFX_DIAG 1
+#else
+#define NOOTRX_GFX_DIAG 0
+#endif
+
 // Long-run GFX/KIQ diagnostics policy. Every decision here is pure so it can be
 // unit tested on the host, away from the kernel build environment.
 namespace GfxDiagPolicy {

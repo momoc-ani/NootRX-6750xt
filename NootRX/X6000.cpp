@@ -43,6 +43,7 @@ bool X6000::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sli
                 "Failed to apply Navi 22 HwlConvertChipFamily patch");
         }
 
+#if NOOTRX_GFX_DIAG
         auto *gfxDiag = NootRXMain::callback->getGfxDiag();
         if (gfxDiag->isEnabled()) {
             // Reset/hang probes: request a ring dump the moment the driver notices a hang or resets the GPU.
@@ -78,6 +79,8 @@ bool X6000::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sli
             SYSLOG("X6000", "Queue probe route mask: 0x%X", queueMask);
         }
 
+#endif    // NOOTRX_GFX_DIAG
+
         return true;
     }
 
@@ -89,6 +92,8 @@ IOReturn X6000::wrapGetHWInfo(IOService *accelVideoCtx, void *hwInfo) {
     getMember<UInt16>(hwInfo, 0x4) = NootRXMain::callback->attributes.isNavi21() ? 0x73BF : 0x73FF;
     return ret;
 }
+
+#if NOOTRX_GFX_DIAG
 
 // Records one reset-path probe event and asks for an asynchronous ring dump.
 UInt64 X6000::runResetProbe(UInt32 probe, UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
@@ -140,3 +145,5 @@ UInt64 X6000::wrapChannelComplete(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UI
 UInt64 X6000::wrapWorkSubmitted(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
     return runQueueProbe(2, a0, a1, a2, a3, a4, a5);
 }
+
+#endif    // NOOTRX_GFX_DIAG

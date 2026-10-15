@@ -331,6 +331,7 @@ bool HWLibs::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sl
                 "Failed to apply debug enablement patches");
         }
 
+#if NOOTRX_GFX_DIAG
         auto *gfxDiag = NootRXMain::callback->getGfxDiag();
         if (gfxDiag->isEnabled() && kextRadeonX6810HWLibs.loadIndex == id) {
             // Read-only GC probes; each route is installed independently so a missing symbol
@@ -355,6 +356,8 @@ bool HWLibs::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sl
             gfxDiag->record(GfxDiagTag::Boot, 0x1000, probeMask, 0);
             SYSLOG("HWLibs", "GC RLC/KIQ probe route mask: 0x%X", probeMask);
         }
+
+#endif    // NOOTRX_GFX_DIAG
 
         return true;
     }
@@ -517,15 +520,19 @@ CAILResult HWLibs::wrapPspCmdKmSubmit(void *ctx, void *cmd, void *outData, void 
 
 // Forwards one PSP command to the original implementation and records duration plus result.
 CAILResult HWLibs::submitPspCommand(void *ctx, void *cmd, void *outData, void *outResponse) {
+#if NOOTRX_GFX_DIAG
     auto *diag = NootRXMain::callback->getGfxDiag();
     const auto cmdID = getMember<AMDPSPCommand>(cmd, 0x0);
     const auto start = mach_absolute_time();
+#endif
     const auto result = FunctionCast(submitPspCommand, callback->orgPspCmdKmSubmit)(ctx, cmd, outData, outResponse);
+#if NOOTRX_GFX_DIAG
     UInt64 elapsedNs = 0;
     absolutetime_to_nanoseconds(mach_absolute_time() - start, &elapsedNs);
-
-    diag->record(GfxDiagTag::PspSubmit, static_cast<UInt32>(cmdID) | 0x8000U, static_cast<UInt32>(elapsedNs / 1000000ULL),
-        static_cast<UInt32>(elapsedNs / 1000ULL) & 0xFFFFU, static_cast<SInt32>(result));
+    diag->record(GfxDiagTag::PspSubmit, static_cast<UInt32>(cmdID) | 0x8000U,
+        static_cast<UInt32>(elapsedNs / 1000000ULL), static_cast<UInt32>(elapsedNs / 1000ULL) & 0xFFFFU,
+        static_cast<SInt32>(result));
+#endif
     return result;
 }
 
@@ -546,6 +553,8 @@ CAILResult HWLibs::wrapSmu1107SendMessageWithParameter(void *smum, UInt32 msgId,
     }
     return result;
 }
+
+#if NOOTRX_GFX_DIAG
 
 // Records entry and exit of one GC probe and forwards every argument register untouched.
 UInt64 HWLibs::runGcProbe(UInt32 probe, UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
@@ -594,3 +603,5 @@ UInt64 HWLibs::wrapGcCheckUcodeLoaded(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3
 UInt64 HWLibs::wrapGcFwBackdoorAutoloadValidate(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
     return runGcProbe(7, a0, a1, a2, a3, a4, a5);
 }
+
+#endif    // NOOTRX_GFX_DIAG

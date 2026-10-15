@@ -28,8 +28,10 @@ NootRXMain *NootRXMain::callback = nullptr;
 void NootRXMain::init() {
     SYSLOG("NootRX", "Copyright 2023-2024 ChefKiss. If you've paid for this, you've been scammed.");
 
+#if NOOTRX_GFX_DIAG
     this->gfxDiagRequested = checkKernelArgument(GfxDiagPolicy::BootArg);
     SYSLOG_COND(this->gfxDiagRequested, "NootRX", "GFX/KIQ diagnostics requested by %s", GfxDiagPolicy::BootArg);
+#endif
 
     switch (getKernelVersion()) {
         case KernelVersion::BigSur:
@@ -169,12 +171,14 @@ void NootRXMain::processPatcher(KernelPatcher &patcher) {
 
     this->configurePowerOverrides();
 
+#if NOOTRX_GFX_DIAG
     this->gfxDiag.configure(this->dGPU, GfxDiagPolicy::isTarget(this->gfxDiagRequested, this->deviceId));
     if (this->gfxDiag.isEnabled()) {
         this->gfxDiag.record(GfxDiagTag::Boot, this->deviceId, this->pciRevision, this->enumRevision);
         SYSLOG("NootRX", "GFX diagnostics active: device=0x%04X pciRev=0x%02X enumRev=0x%X devRev=0x%X",
             this->deviceId, this->pciRevision, this->enumRevision, this->devRevision);
     }
+#endif
 
     DeviceInfo::deleter(devInfo);
 

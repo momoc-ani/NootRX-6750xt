@@ -3,6 +3,7 @@
 
 #pragma once
 #include "AMDCommon.hpp"
+#include "DiagPolicy.hpp"
 #include "ObjectField.hpp"
 #include <Headers/kern_patcher.hpp>
 #include <Headers/kern_util.hpp>
@@ -19,13 +20,16 @@ class HWLibs {
 
     mach_vm_address_t orgPspCmdKmSubmit {0};
     mach_vm_address_t orgSmu1107SendMessageWithParameter {0};
+#if NOOTRX_GFX_DIAG
     mach_vm_address_t orgGcProbes[8] {};
+#endif
 
     static const char *wrapGetMatchProperty(void);
     static CAILResult wrapPspCmdKmSubmit(void *ctx, void *cmd, void *outData, void *outResponse);
     static CAILResult submitPspCommand(void *ctx, void *cmd, void *outData, void *outResponse);
     static CAILResult wrapSmu1107SendMessageWithParameter(void *smum, UInt32 msgId, UInt32 param);
 
+#if NOOTRX_GFX_DIAG
     // Read-only GC probes around the RLC and KIQ paths; each one forwards all integer
     // argument registers untouched and records entry plus exit in the diagnostics ring.
     static UInt64 wrapGcSetupRlc(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
@@ -37,6 +41,7 @@ class HWLibs {
     static UInt64 wrapGcCheckUcodeLoaded(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
     static UInt64 wrapGcFwBackdoorAutoloadValidate(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
     static UInt64 runGcProbe(UInt32 probe, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
+#endif    // NOOTRX_GFX_DIAG
 };
 
 //------ Patterns ------//

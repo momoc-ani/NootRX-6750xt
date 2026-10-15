@@ -37,6 +37,33 @@ struct GfxDiagEvent {
     char text[GfxDiagPolicy::TextLength];
 };
 
+#if !NOOTRX_GFX_DIAG
+
+// Release builds get an empty recorder: every call site stays source compatible and
+// compiles to nothing.
+class GfxDiag {
+    public:
+    void configure(IOPCIDevice *, bool) {}
+    bool isEnabled() const { return false; }
+    void record(GfxDiagTag, UInt32, UInt32 = 0, UInt32 = 0, SInt32 = 0) {}
+    void recordMessage(GfxDiagTag, const char *, UInt32 = 0) {}
+    void countMessageType(UInt32) {}
+    UInt32 countSmuMessage(UInt32) { return 0; }
+    void publishProbeMask(UInt32) {}
+    void publishDump(const char *) {}
+    void requestDump() {}
+    void buildSummary(char *out, size_t length) {
+        if (out != nullptr && length > 0) { out[0] = '\0'; }
+    }
+    void disable(const char *) {}
+    void flush(const char *, bool = false) {}
+    void channelSubmit(UInt64) {}
+    void channelComplete(UInt64) {}
+    void noteWorkSubmitted() {}
+};
+
+#else
+
 class GfxDiag {
     public:
     // Prepares the recorder for the detected GPU and starts the heartbeat when enabled.
@@ -121,3 +148,5 @@ class GfxDiag {
     thread_call_t dumpCall {nullptr};
     char dumpBuffer[GfxDiagPolicy::DumpLength] {};
 };
+
+#endif
