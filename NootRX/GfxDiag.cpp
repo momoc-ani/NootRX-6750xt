@@ -150,34 +150,35 @@ void GfxDiag::channelSubmit(UInt64 channel) {
     const auto interruptState = IOSimpleLockLockDisableInterrupt(this->lock);
     const auto index = channelIndexLocked(channel);
     if (index != 0xFFFFFFFFU) {
-        this->channelPending[index] += 1;
-        if (this->channelPending[index] == 1) {
+        if (this->channelOutstanding[index] == 0) {
+            this->channelPendingStart[index] = uptimeSeconds();
             this->channelSubmits[index] += 1;
-            this->channelBusyStart[index] = uptimeSeconds();
         }
+        this->channelOutstanding[index] += 1;
     }
     IOSimpleLockUnlockEnableInterrupt(this->lock, interruptState);
 }
 
+// The timestamp interrupt means the channel made progress: outstanding work is drained
+// and the stall window restarts from this moment.
 void GfxDiag::channelComplete(UInt64 channel) {
     if (!this->enabled || this->lock == nullptr) { return; }
 
+    const auto now = uptimeSeconds();
     const auto interruptState = IOSimpleLockLockDisableInterrupt(this->lock);
     const auto index = channelIndexLocked(channel);
-    bool becameIdle = false;
     UInt32 busySeconds = 0;
-    if (index != 0xFFFFFFFFU && this->channelPending[index] > 0) {
-        this->channelPending[index] -= 1;
-        if (this->channelPending[index] == 0) {
-            becameIdle = true;
-            const auto now = uptimeSeconds();
-            if (now > this->channelBusyStart[index]) { busySeconds = static_cast<UInt32>(now - this->channelBusyStart[index]); }
+    if (index != 0xFFFFFFFFU && this->channelOutstanding[index] > 0) {
+        if (this->channelPendingStart[index] != 0 && now > this->channelPendingStart[index]) {
+            busySeconds = static_cast<UInt32>(now - this->channelPendingStart[index]);
         }
+        this->channelOutstanding[index] = 0;
+        this->channelPendingStart[index] = 0;
     }
     IOSimpleLockUnlockEnableInterrupt(this->lock, interruptState);
 
     // Only long-running jobs are reported; short submit/complete pairs stay uncounted.
-    if (becameIdle && busySeconds >= 2) { this->record(GfxDiagTag::QueueEvent, index, busySeconds, 4); }
+    if (busySeconds >= 2) { this->record(GfxDiagTag::QueueEvent, index, busySeconds, 4); }
 }
 
 void GfxDiag::noteWorkSubmitted() {
@@ -289,16 +290,15 @@ void GfxDiag::stallCheckCallback(thread_call_param_t param0, thread_call_param_t
 
     const auto now = uptimeSeconds();
     UInt64 busySeconds[ChannelSlots] = {};
-    UInt32 pending[ChannelSlots] = {};
-    UInt32 submits[ChannelSlots] = {};
+    UInt32 outstanding[ChannelSlots] = {};
     UInt32 workCount = 0;
 
     const auto interruptState = IOSimpleLockLockDisableInterrupt(diag->lock);
     for (UInt32 index = 0; index < ChannelSlots; index += 1) {
-        pending[index] = diag->channelPending[index];
-        submits[index] = diag->channelSubmits[index];
-        if (pending[index] > 0 && now > diag->channelBusyStart[index]) {
-            busySeconds[index] = now - diag->channelBusyStart[index];
+        outstanding[index] = static_cast<UInt32>(diag->channelOutstanding[index]);
+        if (outstanding[index] > 0 && diag->channelPendingStart[index] != 0 &&
+            now > diag->channelPendingStart[index]) {
+            busySeconds[index] = now - diag->channelPendingStart[index];
         }
     }
     workCount = diag->workSubmittedCount - diag->workSubmittedReported;
@@ -306,7 +306,7 @@ void GfxDiag::stallCheckCallback(thread_call_param_t param0, thread_call_param_t
     IOSimpleLockUnlockEnableInterrupt(diag->lock, interruptState);
 
     for (UInt32 index = 0; index < ChannelSlots; index += 1) {
-        if (pending[index] == 0 || busySeconds[index] < 3) { continue; }
+        if (outstanding[index] == 0 || busySeconds[index] < 3) { continue; }
         diag->record(GfxDiagTag::QueueEvent, index, static_cast<UInt32>(busySeconds[index]), 3);
     }
     if (workCount > 0) { diag->record(GfxDiagTag::QueueEvent, 0xFFFFU, workCount, 2); }

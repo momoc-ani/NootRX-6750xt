@@ -143,7 +143,8 @@ class GfxDiag {
     UInt64 channelKeys[ChannelSlots] {};
     UInt32 channelPending[ChannelSlots] {};
     UInt32 channelSubmits[ChannelSlots] {};
-    UInt64 channelBusyStart[ChannelSlots] {};
+    UInt64 channelPendingStart[ChannelSlots] {};
+    UInt64 channelOutstanding[ChannelSlots] {};
     UInt32 workSubmittedCount {0};
     UInt32 workSubmittedReported {0};
     UInt32 probeMask {0};
