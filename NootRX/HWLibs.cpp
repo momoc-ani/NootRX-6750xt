@@ -355,6 +355,16 @@ bool HWLibs::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sl
             gfxDiag->publishProbeMask(probeMask);
             gfxDiag->record(GfxDiagTag::Boot, 0x1000, probeMask, 0);
             SYSLOG("HWLibs", "GC RLC/KIQ probe route mask: 0x%X", probeMask);
+
+            // The driver's own GC hang register list (90 {segment, offset} pairs); X6000 reads it at hang time.
+            mach_vm_address_t hangList = 0;
+            SolveRequestPlus hangListRequest {"_gc_nutcracker_reg_list_10_3", hangList};
+            const bool hangListFound = hangListRequest.solve(patcher, id, slide, size);
+            if (hangListFound) {
+                gfxDiag->setHangRegisterList(reinterpret_cast<const UInt32 *>(hangList), GcHangRegisterCount);
+            }
+            gfxDiag->record(GfxDiagTag::Boot, 0x1001, hangListFound ? GcHangRegisterCount : 0, 0);
+            SYSLOG("HWLibs", "GC hang register list %s", hangListFound ? "resolved" : "not found");
         }
 
 #endif    // NOOTRX_GFX_DIAG

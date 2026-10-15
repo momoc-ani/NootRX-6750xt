@@ -44,6 +44,11 @@ class HWLibs {
 #endif    // NOOTRX_GFX_DIAG
 };
 
+#if NOOTRX_GFX_DIAG
+// Entry count of _gc_nutcracker_reg_list_10_3 in AMDRadeonX6810HWLibs (passed as 0x5A to its dump routine).
+static constexpr UInt32 GcHangRegisterCount = 0x5A;
+#endif
+
 //------ Patterns ------//
 
 static const UInt8 kDeviceTypeTablePattern[] = {0x60, 0x68, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x61, 0x68, 0x00, 0x00,

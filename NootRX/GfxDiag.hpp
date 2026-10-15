@@ -23,6 +23,10 @@ enum class GfxDiagTag : UInt32 {
     Heartbeat,
     ResetEvent,
     QueueEvent,
+    // One GC register read at hang time: a=list index, b=MMIO dword offset, c=value.
+    HangRegister,
+    // CP execution point handed to the hang report: a=consumed dwords, b=IB dwords, c=IB address low.
+    ExecutionPoint,
 };
 
 // One fixed-size ring slot. Text is truncated and never contains kernel or GPU addresses.
@@ -60,6 +64,7 @@ class GfxDiag {
     void channelSubmit(UInt64) {}
     void channelComplete(UInt64) {}
     void noteWorkSubmitted() {}
+    void setHangRegisterList(const UInt32 *, UInt32) {}
 };
 
 #else
@@ -93,6 +98,16 @@ class GfxDiag {
 
     // Records that the driver signalled newly submitted GPU work to power management.
     void noteWorkSubmitted();
+
+    // Stores the driver's own GC hang register list ({segment, offset} pairs) for hang-time capture.
+    void setHangRegisterList(const UInt32 *list, UInt32 count) {
+        this->hangRegisterList = list;
+        this->hangRegisterCount = count;
+    }
+
+    // Returns the stored GC hang register list; null until HWLibs resolved it.
+    const UInt32 *getHangRegisterList() const { return this->hangRegisterList; }
+    UInt32 getHangRegisterCount() const { return this->hangRegisterCount; }
 
     // Publishes the current ring as one bounded IORegistry string for a user-space collector.
     void publishDump(const char *reason);
@@ -148,6 +163,8 @@ class GfxDiag {
     UInt32 workSubmittedCount {0};
     UInt32 workSubmittedReported {0};
     UInt32 probeMask {0};
+    const UInt32 *hangRegisterList {nullptr};
+    UInt32 hangRegisterCount {0};
     UInt64 dumpSeq {0};
     UInt64 lastFlushSeconds {0};
     bool enabled {false};

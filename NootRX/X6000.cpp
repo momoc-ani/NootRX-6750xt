@@ -77,6 +77,8 @@ bool X6000::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sli
             }
             gfxDiag->record(GfxDiagTag::Boot, 0x3000, queueMask, 0);
             SYSLOG("X6000", "Queue probe route mask: 0x%X", queueMask);
+
+            installExecutionPointLocator(patcher, id);
         }
 
 #endif    // NOOTRX_GFX_DIAG
@@ -99,6 +101,8 @@ IOReturn X6000::wrapGetHWInfo(IOService *accelVideoCtx, void *hwInfo) {
 UInt64 X6000::runResetProbe(UInt32 probe, UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
     auto *diag = NootRXMain::callback->getGfxDiag();
     diag->record(GfxDiagTag::ResetEvent, probe, static_cast<UInt32>(a0), static_cast<UInt32>(a1));
+    // The hang state must be sampled before the driver's own dump/reset touches the GPU.
+    if (probe == 0) { captureHangRegisters(); }
     diag->requestDump();
 
     const auto original = callback->orgResetProbes[probe];
@@ -144,6 +148,72 @@ UInt64 X6000::wrapChannelComplete(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UI
 
 UInt64 X6000::wrapWorkSubmitted(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
     return runQueueProbe(2, a0, a1, a2, a3, a4, a5);
+}
+
+void X6000::captureHangRegisters() {
+    auto *diag = NootRXMain::callback->getGfxDiag();
+    const auto *list = diag->getHangRegisterList();
+    const auto count = diag->getHangRegisterCount();
+    if (list == nullptr || count == 0) {
+        diag->record(GfxDiagTag::HangRegister, 0xFFFFFFFFU, 0, 0);
+        return;
+    }
+
+    // Each entry is {segment, offset}; only the two GC segments are expected, others are skipped.
+    for (UInt32 index = 0; index < count; index += 1) {
+        const auto segment = list[index * 2];
+        const auto offset = list[index * 2 + 1];
+        if (segment >= arrsize(GcSegmentBase)) { continue; }
+        const auto reg = GcSegmentBase[segment] + offset;
+        diag->record(GfxDiagTag::HangRegister, index, reg, NootRXMain::callback->readReg32(reg));
+    }
+}
+
+void X6000::installExecutionPointLocator(KernelPatcher &patcher, size_t id) {
+    auto *diag = NootRXMain::callback->getGfxDiag();
+    auto vtable = patcher.solveSymbol(id, "__ZTV33AMDRadeonX6000_AMDNavi23PM4Engine");
+    if (vtable == 0) {
+        patcher.clearError();
+        diag->record(GfxDiagTag::Boot, 0x4000, 0, 1);
+        SYSLOG("X6000", "Execution point locator: Navi23 PM4 engine vtable not found");
+        return;
+    }
+
+    // Only replace the slot when it still holds the known "return -1" stub of this build.
+    auto *slot = reinterpret_cast<UInt64 *>(vtable + kExecutionPointVtableOffset);
+    const auto *current = reinterpret_cast<const UInt8 *>(*slot);
+    if (current == nullptr || memcmp(current, kExecutionPointStub, sizeof(kExecutionPointStub)) != 0) {
+        diag->record(GfxDiagTag::Boot, 0x4000, 0, 2);
+        SYSLOG("X6000", "Execution point locator: unexpected slot contents, left untouched");
+        return;
+    }
+
+    if (MachInfo::setKernelWriting(true, KernelPatcher::kernelWriteLock) != KERN_SUCCESS) {
+        diag->record(GfxDiagTag::Boot, 0x4000, 0, 3);
+        SYSLOG("X6000", "Execution point locator: kernel writing unavailable");
+        return;
+    }
+    *slot = reinterpret_cast<UInt64>(wrapGetExecutionPoint);
+    MachInfo::setKernelWriting(false, KernelPatcher::kernelWriteLock);
+
+    diag->record(GfxDiagTag::Boot, 0x4000, 1, 0);
+    SYSLOG("X6000", "Execution point locator installed");
+}
+
+UInt32 X6000::wrapGetExecutionPoint(void *, void *, UInt64 gpuAddress, UInt32 sizeDwords) {
+    auto *main = NootRXMain::callback;
+    const UInt64 ibBase = (static_cast<UInt64>(main->readReg32(mmCP_IB1_BASE_HI) & 0xFFFF) << 32) |
+                          main->readReg32(mmCP_IB1_BASE_LO);
+    const auto bufSize = main->readReg32(mmCP_IB1_BUFSZ);
+    const auto remain = main->readReg32(mmCP_IB1_BUFSZ_REMAIN);
+    const UInt32 consumed = bufSize >= remain ? bufSize - remain : 0;
+
+    // Only the buffer CP is executing right now gets a position; every other buffer keeps the
+    // driver's original "no execution point" behaviour.
+    const bool match = ibBase == gpuAddress && bufSize == sizeDwords && consumed <= sizeDwords;
+    main->getGfxDiag()->record(GfxDiagTag::ExecutionPoint, consumed, sizeDwords, static_cast<UInt32>(gpuAddress),
+        match ? 1 : 0);
+    return match ? consumed : 0xFFFFFFFFU;
 }
 
 #endif    // NOOTRX_GFX_DIAG
