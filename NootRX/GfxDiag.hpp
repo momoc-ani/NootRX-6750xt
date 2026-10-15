@@ -22,6 +22,7 @@ enum class GfxDiagTag : UInt32 {
     GpuPanic,
     Heartbeat,
     ResetEvent,
+    QueueEvent,
 };
 
 // One fixed-size ring slot. Text is truncated and never contains kernel or GPU addresses.
@@ -59,6 +60,13 @@ class GfxDiag {
     // Publishes the GC probe route mask as its own property so it survives ring churn.
     void publishProbeMask(UInt32 mask);
 
+    // Records per-channel pending-submission transitions: busy on 0 -> 1, idle on 1 -> 0.
+    void channelSubmit(UInt64 channel);
+    void channelComplete(UInt64 channel);
+
+    // Records that the driver signalled newly submitted GPU work to power management.
+    void noteWorkSubmitted();
+
     // Publishes the current ring as one bounded IORegistry string for a user-space collector.
     void publishDump(const char *reason);
 
@@ -87,6 +95,9 @@ class GfxDiag {
     // Returns the seconds since boot for event timestamps.
     static UInt64 uptimeSeconds();
 
+    // Returns the stable index of one channel object, allocating a slot on first sight.
+    UInt32 channelIndexLocked(UInt64 channel);
+
     IOSimpleLock *lock {nullptr};
     IOPCIDevice *provider {nullptr};
     GfxDiagEvent ring[GfxDiagPolicy::RingCapacity] {};
@@ -98,6 +109,10 @@ class GfxDiag {
     UInt32 heartbeatCount {0};
     UInt32 messageTypeCounters[GfxDiagPolicy::MaxLogTypes] {};
     UInt32 smuMessageCounters[GfxDiagPolicy::MaxSmuMessages] {};
+    static constexpr size_t ChannelSlots = 16;
+    UInt64 channelKeys[ChannelSlots] {};
+    UInt32 channelPending[ChannelSlots] {};
+    UInt32 channelSubmits[ChannelSlots] {};
     UInt32 probeMask {0};
     UInt64 dumpSeq {0};
     UInt64 lastFlushSeconds {0};

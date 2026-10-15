@@ -61,6 +61,21 @@ bool X6000::processKext(KernelPatcher &patcher, size_t id, mach_vm_address_t sli
             }
             gfxDiag->record(GfxDiagTag::Boot, 0x2000, probeMask, 0);
             SYSLOG("X6000", "Reset probe route mask: 0x%X", probeMask);
+
+            RouteRequestPlus queueRequests[] = {
+                {"__ZN27AMDRadeonX6000_AMDHWChannel19submitCommandBufferEP30AMD_SUBMIT_COMMAND_BUFFER_INFO",
+                    wrapChannelSubmit, this->orgQueueProbes[0]},
+                {"__ZN27AMDRadeonX6000_AMDHWChannel26timeStampInterruptCallbackEP8OSObjectPv",
+                    wrapChannelComplete, this->orgQueueProbes[1]},
+                {"__ZN26AMDRadeonX6000_AMDHardware22signalGPUWorkSubmittedEv", wrapWorkSubmitted,
+                    this->orgQueueProbes[2]},
+            };
+            UInt32 queueMask = 0;
+            for (size_t index = 0; index < arrsize(queueRequests); index += 1) {
+                if (queueRequests[index].route(patcher, id, slide, size)) { queueMask |= 1U << index; }
+            }
+            gfxDiag->record(GfxDiagTag::Boot, 0x3000, queueMask, 0);
+            SYSLOG("X6000", "Queue probe route mask: 0x%X", queueMask);
         }
 
         return true;
@@ -98,4 +113,30 @@ UInt64 X6000::wrapResetHardware(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt
 
 UInt64 X6000::wrapSignalTimeout(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
     return runResetProbe(2, a0, a1, a2, a3, a4, a5);
+}
+
+// Feeds one queue probe into the busy/idle tracker and forwards all argument registers.
+UInt64 X6000::runQueueProbe(UInt32 probe, UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
+    auto *diag = NootRXMain::callback->getGfxDiag();
+    if (probe == 0) { diag->channelSubmit(a0); }
+    else if (probe == 1) { diag->channelComplete(a0); }
+    else { diag->noteWorkSubmitted(); }
+
+    const auto original = callback->orgQueueProbes[probe];
+    if (original == 0) { return 0; }
+
+    typedef UInt64 (*QueueProbeFunc)(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
+    return reinterpret_cast<QueueProbeFunc>(original)(a0, a1, a2, a3, a4, a5);
+}
+
+UInt64 X6000::wrapChannelSubmit(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
+    return runQueueProbe(0, a0, a1, a2, a3, a4, a5);
+}
+
+UInt64 X6000::wrapChannelComplete(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
+    return runQueueProbe(1, a0, a1, a2, a3, a4, a5);
+}
+
+UInt64 X6000::wrapWorkSubmitted(UInt64 a0, UInt64 a1, UInt64 a2, UInt64 a3, UInt64 a4, UInt64 a5) {
+    return runQueueProbe(2, a0, a1, a2, a3, a4, a5);
 }

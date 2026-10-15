@@ -17,6 +17,7 @@ class X6000 {
     private:
     mach_vm_address_t orgGetHWInfo {0};
     mach_vm_address_t orgResetProbes[3] {};
+    mach_vm_address_t orgQueueProbes[3] {};
 
     static IOReturn wrapGetHWInfo(IOService *accelVideoCtx, void *hwInfo);
 
@@ -25,6 +26,12 @@ class X6000 {
     static UInt64 wrapResetHardware(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
     static UInt64 wrapSignalTimeout(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
     static UInt64 runResetProbe(UInt32 probe, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
+
+    // Queue submission/completion probes feeding the busy/idle transition tracker.
+    static UInt64 wrapChannelSubmit(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
+    static UInt64 wrapChannelComplete(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
+    static UInt64 wrapWorkSubmitted(UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
+    static UInt64 runQueueProbe(UInt32 probe, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64);
 };
 
 //------ Patches ------//

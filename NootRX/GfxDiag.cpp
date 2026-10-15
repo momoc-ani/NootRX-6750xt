@@ -123,6 +123,65 @@ void GfxDiag::publishProbeMask(UInt32 mask) {
     }
 }
 
+// Maps one channel object to a stable small index; kernel pointers never leave the kext.
+UInt32 GfxDiag::channelIndexLocked(UInt64 channel) {
+    if (channel == 0) { return 0xFFFFFFFFU; }
+    for (UInt32 index = 0; index < ChannelSlots; index += 1) {
+        if (this->channelKeys[index] == channel) { return index; }
+    }
+    for (UInt32 index = 0; index < ChannelSlots; index += 1) {
+        if (this->channelKeys[index] == 0) {
+            this->channelKeys[index] = channel;
+            return index;
+        }
+    }
+    return 0xFFFFFFFFU;
+}
+
+void GfxDiag::channelSubmit(UInt64 channel) {
+    if (!this->enabled || this->lock == nullptr) { return; }
+
+    const auto interruptState = IOSimpleLockLockDisableInterrupt(this->lock);
+    const auto index = channelIndexLocked(channel);
+    bool becameBusy = false;
+    UInt32 submits = 0;
+    if (index != 0xFFFFFFFFU) {
+        this->channelPending[index] += 1;
+        if (this->channelPending[index] == 1) {
+            this->channelSubmits[index] += 1;
+            becameBusy = true;
+            submits = this->channelSubmits[index];
+        }
+    }
+    IOSimpleLockUnlockEnableInterrupt(this->lock, interruptState);
+
+    if (becameBusy) { this->record(GfxDiagTag::QueueEvent, index, submits, 1); }
+}
+
+void GfxDiag::channelComplete(UInt64 channel) {
+    if (!this->enabled || this->lock == nullptr) { return; }
+
+    const auto interruptState = IOSimpleLockLockDisableInterrupt(this->lock);
+    const auto index = channelIndexLocked(channel);
+    bool becameIdle = false;
+    UInt32 submits = 0;
+    if (index != 0xFFFFFFFFU && this->channelPending[index] > 0) {
+        this->channelPending[index] -= 1;
+        if (this->channelPending[index] == 0) {
+            becameIdle = true;
+            submits = this->channelSubmits[index];
+        }
+    }
+    IOSimpleLockUnlockEnableInterrupt(this->lock, interruptState);
+
+    if (becameIdle) { this->record(GfxDiagTag::QueueEvent, index, submits, 0); }
+}
+
+void GfxDiag::noteWorkSubmitted() {
+    if (!this->enabled) { return; }
+    this->record(GfxDiagTag::QueueEvent, 0xFFFFU, 0, 2);
+}
+
 void GfxDiag::publishDump(const char *reason) {
     if (this->provider == nullptr || this->lock == nullptr) { return; }
 
